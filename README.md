@@ -65,7 +65,8 @@ Interface exposta ao módulo WASM:
 
 ## Roadmap
 
-- [ ] Integrar o motor de recompilação compilado com Emscripten
+- [x] Prova de conceito: `libultraship` (renderizador do SpaghettiKart) rodando no navegador com WebGL2, ver [`web/README.md`](web/README.md)
+- [ ] Compilar o jogo (SpaghettiKart) para WASM e portar o extrator de assets (Torch)
 - [ ] Renderização via WebGL no canvas e áudio via Web Audio
 - [ ] Multiplayer online (WebRTC peer-to-peer, sincronização de inputs)
 - [ ] Workflow de CI para compilar e publicar o `.wasm`

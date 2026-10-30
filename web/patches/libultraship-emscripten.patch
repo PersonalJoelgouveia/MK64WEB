@@ -1,0 +1,78 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 08cc791..0c3e574 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -68,6 +68,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+     include(cmake/dependencies/openbsd.cmake)
+ endif()
+ 
++if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++    include(cmake/dependencies/emscripten.cmake)
++endif()
++
+ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+     include(cmake/dependencies/windows.cmake)
+ endif()
+diff --git a/cmake/dependencies/common.cmake b/cmake/dependencies/common.cmake
+index 80dec56..227cdd2 100644
+--- a/cmake/dependencies/common.cmake
++++ b/cmake/dependencies/common.cmake
+@@ -52,7 +52,12 @@ endif()
+ 
+ #=================== STB ===================
+ set(STB_DIR ${CMAKE_BINARY_DIR}/_deps/stb)
+-file(DOWNLOAD "https://github.com/nothings/stb/raw/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h" "${STB_DIR}/stb_image.h")
++if(DEFINED LUS_STB_IMAGE_H AND EXISTS "${LUS_STB_IMAGE_H}")
++    file(MAKE_DIRECTORY "${STB_DIR}")
++    file(COPY_FILE "${LUS_STB_IMAGE_H}" "${STB_DIR}/stb_image.h" ONLY_IF_DIFFERENT)
++else()
++    file(DOWNLOAD "https://github.com/nothings/stb/raw/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h" "${STB_DIR}/stb_image.h")
++endif()
+ file(WRITE "${STB_DIR}/stb_impl.c" "#define STB_IMAGE_IMPLEMENTATION\n#include \"stb_image.h\"")
+ 
+ add_library(stb STATIC)
+diff --git a/cmake/dependencies/emscripten.cmake b/cmake/dependencies/emscripten.cmake
+new file mode 100644
+index 0000000..fd04f27
+--- /dev/null
++++ b/cmake/dependencies/emscripten.cmake
+@@ -0,0 +1,13 @@
++#=================== ImGui (Emscripten / WebGL2) ===================
++find_package(SDL2 REQUIRED CONFIG)
++if(NOT TARGET SDL2::SDL2)
++    add_library(SDL2::SDL2 INTERFACE IMPORTED)
++    target_link_libraries(SDL2::SDL2 INTERFACE SDL2::SDL2-static)
++endif()
++target_link_libraries(ImGui PUBLIC SDL2::SDL2)
++
++# No navegador só existe OpenGL ES 3 (WebGL2).
++if(NOT USE_OPENGLES)
++    message(FATAL_ERROR "Emscripten requer -DUSE_OPENGLES=ON (WebGL2)")
++endif()
++add_compile_definitions(IMGUI_IMPL_OPENGL_ES3)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 45989b6..19eff42 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -126,6 +126,8 @@ if (USE_OPENGLES)
+         target_link_libraries(libultraship PRIVATE GLESv3)
+     elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+         target_link_libraries(libultraship PRIVATE OpenGL::GLES2)
++    elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++        # WebGL2 é fornecido pelo emcc (-sMAX_WEBGL_VERSION=2); nada a procurar.
+     else()
+         find_library(OPENGLES_LIBRARY GLESv2)
+         target_link_libraries(libultraship PRIVATE GLESv2)
+diff --git a/src/fast/backends/gfx_opengl.cpp b/src/fast/backends/gfx_opengl.cpp
+index ad9b1dd..f6c06b9 100644
+--- a/src/fast/backends/gfx_opengl.cpp
++++ b/src/fast/backends/gfx_opengl.cpp
+@@ -708,7 +708,7 @@ void GfxRenderingAPIOGL::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size
+ }
+ 
+ void GfxRenderingAPIOGL::Init() {
+-#if !defined(__linux__) && !defined(__OpenBSD__)
++#if !defined(__linux__) && !defined(__OpenBSD__) && !defined(__EMSCRIPTEN__)
+     glewInit();
+ #endif
+ 
