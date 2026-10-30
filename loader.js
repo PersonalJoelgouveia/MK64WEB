@@ -3,7 +3,7 @@
  * 2) Detecta o formato (z64 / v64 / n64) e normaliza para big-endian (.z64).
  * 3) Valida o Game ID do cabeçalho (NKTE, NKTP, NKTJ).
  * 4) Expõe a ROM normalizada para o módulo WASM via evento "mk64:rom-ready".
- * 5) Gerencia entrada (teclado + controles virtuais) em window.MK64Input.
+ * (A entrada — teclado, gamepad e toque — fica em input.js.)
  */
 (function () {
   'use strict';
@@ -243,108 +243,9 @@
   });
 
   // ---------------------------------------------------------------------------
-  // Entrada: teclado + controles virtuais -> window.MK64Input
-  // ---------------------------------------------------------------------------
-  const KEYMAP = {
-    KeyX: 'A', KeyZ: 'B', Space: 'Z', KeyS: 'R', KeyQ: 'L', Enter: 'START',
-    KeyI: 'C_UP', KeyJ: 'C_LEFT', KeyK: 'C_DOWN', KeyL: 'C_RIGHT',
-  };
-  const STICK_KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
-
-  const input = {
-    buttons: {},          // { A:true, B:false, ... }
-    stick: { x: 0, y: 0 } // -1..1 (x: direita+, y: cima+)
-  };
-  window.MK64Input = input;
-
-  const dirs = { left: false, right: false, up: false, down: false };
-  let virtualStick = { x: 0, y: 0 };
-
-  function updateStick() {
-    const kx = (dirs.right ? 1 : 0) - (dirs.left ? 1 : 0);
-    const ky = (dirs.up ? 1 : 0) - (dirs.down ? 1 : 0);
-    input.stick.x = kx || virtualStick.x;
-    input.stick.y = ky || virtualStick.y;
-    const row = document.querySelector('.keymap tr[data-btn="STICK"]');
-    if (row) row.classList.toggle('active', !!(input.stick.x || input.stick.y));
-  }
-
-  function setButton(name, pressed) {
-    input.buttons[name] = pressed;
-    const row = document.querySelector('.keymap tr[data-btn="' + name + '"]');
-    if (row) row.classList.toggle('active', pressed);
-    const vb = document.querySelector('.vbtn[data-btn="' + name + '"]');
-    if (vb) vb.classList.toggle('pressed', pressed);
-  }
-
-  function onKey(e, pressed) {
-    const tag = (e.target && e.target.tagName) || '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if (STICK_KEYS[e.code]) {
-      dirs[STICK_KEYS[e.code]] = pressed;
-      updateStick();
-      e.preventDefault();
-    } else if (KEYMAP[e.code]) {
-      setButton(KEYMAP[e.code], pressed);
-      e.preventDefault();
-    }
-  }
-  window.addEventListener('keydown', (e) => { if (!e.repeat) onKey(e, true); });
-  window.addEventListener('keyup', (e) => onKey(e, false));
-  window.addEventListener('blur', () => {
-    Object.keys(dirs).forEach((k) => (dirs[k] = false));
-    Object.keys(input.buttons).forEach((k) => setButton(k, false));
-    virtualStick = { x: 0, y: 0 };
-    updateStick();
-  });
-
-  // Botões virtuais (Pointer Events: multi-toque funciona por botão)
-  document.querySelectorAll('.vbtn[data-btn]').forEach((btn) => {
-    const name = btn.dataset.btn;
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); setButton(name, true); });
-    const up = (e) => { e.preventDefault(); setButton(name, false); };
-    btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointercancel', up);
-    btn.addEventListener('contextmenu', (e) => e.preventDefault());
-  });
-
-  // Analógico virtual
-  const stick = $('stick');
-  const knob = $('stickKnob');
-  if (stick && knob) {
-    let activeId = null;
-    const move = (e) => {
-      const r = stick.getBoundingClientRect();
-      const max = r.width / 2 - 10;
-      let dx = e.clientX - (r.left + r.width / 2);
-      let dy = e.clientY - (r.top + r.height / 2);
-      const dist = Math.hypot(dx, dy);
-      if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max; }
-      knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-      virtualStick = { x: +(dx / max).toFixed(3), y: +(-dy / max).toFixed(3) };
-      updateStick();
-    };
-    const end = (e) => {
-      if (e.pointerId !== activeId) return;
-      activeId = null;
-      knob.style.transform = '';
-      virtualStick = { x: 0, y: 0 };
-      updateStick();
-    };
-    stick.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      activeId = e.pointerId;
-      stick.setPointerCapture(e.pointerId);
-      move(e);
-    });
-    stick.addEventListener('pointermove', (e) => { if (e.pointerId === activeId) move(e); });
-    stick.addEventListener('pointerup', end);
-    stick.addEventListener('pointercancel', end);
-  }
-
-  // ---------------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------------
+  window.MK64Log = log; // usado por input.js
   log('MK64 Web iniciado. Selecione sua ROM (NKTE, NKTP ou NKTJ).');
 
   // Exposto para testes/depuração e para o módulo WASM

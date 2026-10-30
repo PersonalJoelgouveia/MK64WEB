@@ -58,33 +58,6 @@
         <button class="btn btn-ghost" id="btnReset" type="button" disabled>Trocar ROM</button>
         <span class="rom-info" id="romInfo"></span>
       </div>
-
-      <!-- CONTROLES VIRTUAIS (mobile) -->
-      <div class="touch" id="touch" aria-label="Controles virtuais">
-        <div class="touch-shoulders">
-          <button class="vbtn" data-btn="L" type="button">L</button>
-          <button class="vbtn" data-btn="Z" type="button">Z</button>
-          <button class="vbtn" data-btn="R" type="button">R</button>
-        </div>
-        <div class="touch-main">
-          <div class="stick" id="stick" aria-label="Analógico">
-            <div class="stick-knob" id="stickKnob"></div>
-          </div>
-          <div class="touch-center">
-            <button class="vbtn vbtn-small" data-btn="START" type="button">START</button>
-            <div class="cpad">
-              <button class="vbtn vbtn-c" data-btn="C_UP" type="button">▲</button>
-              <button class="vbtn vbtn-c" data-btn="C_LEFT" type="button">◀</button>
-              <button class="vbtn vbtn-c" data-btn="C_RIGHT" type="button">▶</button>
-              <button class="vbtn vbtn-c" data-btn="C_DOWN" type="button">▼</button>
-            </div>
-          </div>
-          <div class="face">
-            <button class="vbtn vbtn-b" data-btn="B" type="button">B</button>
-            <button class="vbtn vbtn-a" data-btn="A" type="button">A</button>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- PAINEL LATERAL -->
@@ -94,19 +67,21 @@
       <table class="keymap">
         <thead><tr><th>N64</th><th>Tecla</th></tr></thead>
         <tbody>
-          <tr data-btn="STICK"><td>Analógico</td><td><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></td></tr>
+          <tr data-btn="STICK"><td>Analógico</td><td><kbd>W A S D</kbd><kbd>←↑↓→</kbd></td></tr>
           <tr data-btn="A"><td>A (acelerar)</td><td><kbd>X</kbd></td></tr>
           <tr data-btn="B"><td>B (frear/ré)</td><td><kbd>Z</kbd></td></tr>
-          <tr data-btn="Z"><td>Z (item)</td><td><kbd>Espaço</kbd></td></tr>
-          <tr data-btn="R"><td>R (pulo/drift)</td><td><kbd>S</kbd></td></tr>
+          <tr data-btn="Z"><td>Z (item)</td><td><kbd>Shift</kbd></td></tr>
+          <tr data-btn="R"><td>R (pulo/drift)</td><td><kbd>Espaço</kbd></td></tr>
           <tr data-btn="L"><td>L</td><td><kbd>Q</kbd></td></tr>
           <tr data-btn="START"><td>Start</td><td><kbd>Enter</kbd></td></tr>
           <tr data-btn="C_UP"><td>C ▲</td><td><kbd>I</kbd></td></tr>
           <tr data-btn="C_LEFT"><td>C ◀</td><td><kbd>J</kbd></td></tr>
           <tr data-btn="C_DOWN"><td>C ▼</td><td><kbd>K</kbd></td></tr>
           <tr data-btn="C_RIGHT"><td>C ▶</td><td><kbd>L</kbd></td></tr>
+          <tr data-btn="DPAD"><td>D-Pad</td><td><kbd>T</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd></td></tr>
         </tbody>
       </table>
+      <p class="panel-sub" style="margin-top:8px">Gamepad Xbox/PlayStation: conecte e pressione um botão. Em telas touch, os controles aparecem sobre o jogo.</p>
 
       <h2>Online</h2>
       <div class="online">
@@ -131,5 +106,6 @@
   </footer>
 
   <script src="loader.js"></script>
+  <script src="input.js"></script>
 </body>
 </html>
