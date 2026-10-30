@@ -1,0 +1,39 @@
+# ROMs e imagens de cartucho — NUNCA commitar
+*.z64
+*.n64
+*.v64
+*.rom
+*.bin
+*.sra
+*.eep
+*.fla
+*.mpk
+*.sav
+*.srm
+
+# Assets extraídos do jogo (texturas, áudio, modelos, dumps)
+assets/extracted/
+extracted/
+rom_assets/
+*.o2r
+*.otr
+
+# Builds do Emscripten / recomp (gerados no CI, não versionados)
+build/
+out/
+*.wasm
+*.data
+*.wasm.map
+
+# Dependências e ferramentas
+node_modules/
+emsdk/
+.cache/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.swp
