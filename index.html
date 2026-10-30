@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>MK64 Web — Recomp no navegador</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">MK</span>
+      <div>
+        <h1>MK64 Web</h1>
+        <p class="tagline">Recompilação estática no navegador · WebAssembly</p>
+      </div>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">
+      <span class="dot dot-idle" id="statusDot"></span>
+      <span id="statusText">Aguardando ROM</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ÁREA DO JOGO -->
+    <section class="stage" aria-label="Área do jogo">
+      <div class="screen" id="screen">
+        <canvas id="canvas" width="640" height="480" tabindex="-1"></canvas>
+
+        <!-- Container de carregamento da ROM -->
+        <div class="loader" id="loader">
+          <label class="dropzone" id="dropzone" for="romInput">
+            <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>Carregue sua ROM de Mario Kart 64</strong>
+            <span>Arraste o arquivo aqui ou clique para selecionar</span>
+            <small>Formatos aceitos: .z64, .n64, .v64 · NKTE, NKTP ou NKTJ</small>
+            <input type="file" id="romInput" accept=".z64,.n64,.v64,.rom" hidden>
+          </label>
+          <p class="legal">
+            Este site <b>não contém nem distribui</b> nenhum arquivo do jogo.
+            A ROM é lida localmente no seu navegador e nunca é enviada a nenhum servidor.
+            Use apenas uma cópia que você possui legalmente.
+          </p>
+          <p class="error" id="loaderError" role="alert" hidden></p>
+        </div>
+
+        <div class="loading" id="loading" hidden>
+          <div class="spinner"></div>
+          <span id="loadingText">Validando ROM…</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" id="btnFullscreen" type="button">Tela cheia</button>
+        <button class="btn btn-ghost" id="btnReset" type="button" disabled>Trocar ROM</button>
+        <span class="rom-info" id="romInfo"></span>
+      </div>
+
+      <!-- CONTROLES VIRTUAIS (mobile) -->
+      <div class="touch" id="touch" aria-label="Controles virtuais">
+        <div class="touch-shoulders">
+          <button class="vbtn" data-btn="L" type="button">L</button>
+          <button class="vbtn" data-btn="Z" type="button">Z</button>
+          <button class="vbtn" data-btn="R" type="button">R</button>
+        </div>
+        <div class="touch-main">
+          <div class="stick" id="stick" aria-label="Analógico">
+            <div class="stick-knob" id="stickKnob"></div>
+          </div>
+          <div class="touch-center">
+            <button class="vbtn vbtn-small" data-btn="START" type="button">START</button>
+            <div class="cpad">
+              <button class="vbtn vbtn-c" data-btn="C_UP" type="button">▲</button>
+              <button class="vbtn vbtn-c" data-btn="C_LEFT" type="button">◀</button>
+              <button class="vbtn vbtn-c" data-btn="C_RIGHT" type="button">▶</button>
+              <button class="vbtn vbtn-c" data-btn="C_DOWN" type="button">▼</button>
+            </div>
+          </div>
+          <div class="face">
+            <button class="vbtn vbtn-b" data-btn="B" type="button">B</button>
+            <button class="vbtn vbtn-a" data-btn="A" type="button">A</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAINEL LATERAL -->
+    <aside class="panel" aria-label="Controles">
+      <h2>Controles</h2>
+      <p class="panel-sub">Mapeamento de teclado</p>
+      <table class="keymap">
+        <thead><tr><th>N64</th><th>Tecla</th></tr></thead>
+        <tbody>
+          <tr data-btn="STICK"><td>Analógico</td><td><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></td></tr>
+          <tr data-btn="A"><td>A (acelerar)</td><td><kbd>X</kbd></td></tr>
+          <tr data-btn="B"><td>B (frear/ré)</td><td><kbd>Z</kbd></td></tr>
+          <tr data-btn="Z"><td>Z (item)</td><td><kbd>Espaço</kbd></td></tr>
+          <tr data-btn="R"><td>R (pulo/drift)</td><td><kbd>S</kbd></td></tr>
+          <tr data-btn="L"><td>L</td><td><kbd>Q</kbd></td></tr>
+          <tr data-btn="START"><td>Start</td><td><kbd>Enter</kbd></td></tr>
+          <tr data-btn="C_UP"><td>C ▲</td><td><kbd>I</kbd></td></tr>
+          <tr data-btn="C_LEFT"><td>C ◀</td><td><kbd>J</kbd></td></tr>
+          <tr data-btn="C_DOWN"><td>C ▼</td><td><kbd>K</kbd></td></tr>
+          <tr data-btn="C_RIGHT"><td>C ▶</td><td><kbd>L</kbd></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Online</h2>
+      <div class="online">
+        <div class="field">
+          <label for="roomCode">Código da sala</label>
+          <input id="roomCode" type="text" placeholder="Em breve" maxlength="8" disabled>
+        </div>
+        <div class="online-actions">
+          <button class="btn" type="button" disabled>Criar sala</button>
+          <button class="btn btn-ghost" type="button" disabled>Entrar</button>
+        </div>
+        <small>Multiplayer via WebRTC (peer-to-peer) será adicionado em uma próxima etapa.</small>
+      </div>
+
+      <h2>Console</h2>
+      <pre class="log" id="log" aria-live="polite"></pre>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    Projeto de fã, sem fins lucrativos e sem afiliação com a Nintendo. Mario Kart 64 é marca registrada da Nintendo.
+  </footer>
+
+  <script src="loader.js"></script>
+</body>
+</html>
