@@ -1,18 +1,19 @@
 diff --git a/src/main.c b/src/main.c
-index 1bdbee6e1..42560a81d 100644
+index 1bdbee6e1..6e11848ea 100644
 --- a/src/main.c
 +++ b/src/main.c
-@@ -39,6 +39,9 @@
+@@ -39,6 +39,10 @@
  #include "engine/wasm.h"
  #include "port/Game.h"
  #include "port/Engine.h"
 +#ifdef __EMSCRIPTEN__
 +#include "web/mk64_input.h"
++#include "webnet.h"
 +#endif
  #include "engine/Matrix.h"
  #include "engine/TrackBrowser.h"
  
-@@ -395,6 +398,14 @@ void read_controllers(void) {
+@@ -395,6 +399,39 @@ void read_controllers(void) {
      osContStartReadData(&gSIEventMesgQueue);
      // osRecvMesg(&gSIEventMesgQueue, &msg, OS_MESG_BLOCK);
      osContGetReadData(gControllerPads);
@@ -22,6 +23,31 @@ index 1bdbee6e1..42560a81d 100644
 +        mk64_read_pad(0, &b, &sx, &sy);
 +        gControllerPads[0].button |= b;
 +        if (sx != 0 || sy != 0) { gControllerPads[0].stick_x = sx; gControllerPads[0].stick_y = sy; }
++    }
++    if (mk64_net_active()) {
++        /* Multiplayer lockstep: o comando local vai para o outro jogador; os dois jogadores
++           (porta 0 = anfitrião, porta 1 = convidado) vêm do buffer sincronizado. */
++        extern u16 gRandomSeed16;
++        union { f32 f; u32 u; } c;
++        u32 h = 2166136261u, i, k;
++        u32 vals[3 + 2 * 7];
++        vals[0] = gRandomSeed16; vals[1] = (u32) gGlobalTimer; vals[2] = 0;
++        for (i = 0; i < 2; i++) {
++            for (k = 0; k < 3; k++) { c.f = gPlayers[i].pos[k]; vals[3 + i * 7 + k] = c.u; }
++            for (k = 0; k < 3; k++) { c.f = gPlayers[i].velocity[k]; vals[3 + i * 7 + 3 + k] = c.u; }
++            c.f = gPlayers[i].speed; vals[3 + i * 7 + 6] = c.u;
++        }
++        for (i = 0; i < 3 + 2 * 7; i++) { h = (h ^ vals[i]) * 16777619u; }
++        mk64_net_submit(((u32) (u16) gControllerPads[0].button) | ((u32) (u8) gControllerPads[0].stick_x << 16) |
++                            ((u32) (u8) gControllerPads[0].stick_y << 24),
++                        h);
++        for (i = 0; i < 2; i++) {
++            u32 v = mk64_net_get((int) i);
++            gControllerPads[i].button = (u16) (v & 0xFFFF);
++            gControllerPads[i].stick_x = (s8) ((v >> 16) & 0xFF);
++            gControllerPads[i].stick_y = (s8) ((v >> 24) & 0xFF);
++            gControllerPads[i].err_no = 0;
++        }
 +    }
 +#endif
      update_controller(0);
@@ -62,17 +88,18 @@ index 23036adcb..f8975e5a3 100644
  
  uint32_t GameEngine::GetInterpolationFPS() {
 diff --git a/src/port/Game.cpp b/src/port/Game.cpp
-index 19a41f631..46f0b9ebf 100644
+index 19a41f631..43a8fb4ef 100644
 --- a/src/port/Game.cpp
 +++ b/src/port/Game.cpp
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,7 @@
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
++#include "webnet.h"
 +#endif
  #include <libultraship.h>
  #include <typeinfo>
  
-@@ -1048,6 +1051,10 @@ extern "C"
+@@ -1048,6 +1052,10 @@ extern "C"
      // directory, scattering config/saves/mods into the user's home folder.
      // overwrite=0 keeps any SHIP_HOME the user already set.
      setenv("SHIP_HOME", "~/Library/Application Support/SpaghettiKart", 0);
@@ -83,13 +110,18 @@ index 19a41f631..46f0b9ebf 100644
  #endif
      // load_wasm();
      GameEngine::Create();
-@@ -1078,9 +1085,14 @@ extern "C"
+@@ -1078,9 +1086,19 @@ extern "C"
  
      thread5_game_loop();
      gEditor.Load();
 +#ifdef __EMSCRIPTEN__
 +    // No navegador o laço principal não pode bloquear a página: o navegador chama push_frame a cada quadro.
-+    emscripten_set_main_loop([] { if (WindowIsRunning()) push_frame(); }, 0, 1);
++    emscripten_set_main_loop([] {
++        if (WindowIsRunning() && mk64_net_can_tick()) {
++            push_frame();
++            mk64_net_tick_done();
++        }
++    }, 0, 1);
 +#else
      while (WindowIsRunning()) {
          push_frame();

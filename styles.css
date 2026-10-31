@@ -354,3 +354,15 @@ kbd {
     border-top: 1px solid var(--border);
   }
 }
+
+.online textarea {
+  width: 100%; resize: vertical; background: var(--surface, #12151c); color: var(--text, #e8eaf0);
+  border: 1px solid var(--border, #2a2f3a); border-radius: 8px; padding: 8px; font: .72rem/1.3 ui-monospace, monospace; word-break: break-all;
+}
+.online .field .btn { align-self: flex-start; margin-top: 6px; }
+.ready {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; text-align: center; padding: 24px; background: rgba(8, 10, 14, .86); z-index: 5;
+}
+.ready[hidden] { display: none; }
+.ready small { color: var(--muted, #9aa3b2); max-width: 34ch; line-height: 1.4; }

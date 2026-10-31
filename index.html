@@ -48,6 +48,12 @@
           <p class="error" id="loaderError" role="alert" hidden></p>
         </div>
 
+        <div class="ready" id="ready" hidden>
+          <p id="readyText">Assets prontos.</p>
+          <button class="btn" id="btnSolo" type="button">Jogar sozinho</button>
+          <small>Para jogar online, conecte um amigo pelo painel “Online”; o jogo começa nos dois ao mesmo tempo.</small>
+        </div>
+
         <div class="loading" id="loading" hidden>
           <div class="spinner"></div>
           <span id="loadingText">Validando ROM…</span>
@@ -85,16 +91,22 @@
       <p class="panel-sub" style="margin-top:8px">Gamepad Xbox/PlayStation: conecte e pressione um botão. Em telas touch, os controles aparecem sobre o jogo.</p>
 
       <h2>Online</h2>
-      <div class="online">
-        <div class="field">
-          <label for="roomCode">Código da sala</label>
-          <input id="roomCode" type="text" placeholder="Em breve" maxlength="8" disabled>
-        </div>
+      <div class="online" id="online">
         <div class="online-actions">
-          <button class="btn" type="button" disabled>Criar sala</button>
-          <button class="btn btn-ghost" type="button" disabled>Entrar</button>
+          <button class="btn" id="btnHost" type="button">Criar sala</button>
+          <button class="btn btn-ghost" id="btnJoin" type="button">Entrar</button>
         </div>
-        <small>Multiplayer via WebRTC (peer-to-peer) será adicionado em uma próxima etapa.</small>
+        <div class="field" id="fieldMine" hidden>
+          <label for="codeMine" id="lblMine">Seu código</label>
+          <textarea id="codeMine" rows="3" readonly></textarea>
+          <button class="btn btn-ghost" id="btnCopy" type="button">Copiar código</button>
+        </div>
+        <div class="field" id="fieldTheirs" hidden>
+          <label for="codeTheirs" id="lblTheirs">Código do outro jogador</label>
+          <textarea id="codeTheirs" rows="3" spellcheck="false"></textarea>
+          <button class="btn" id="btnApply" type="button">Conectar</button>
+        </div>
+        <small id="netStatus">Sem conexão. Um cria a sala e envia o código ao outro (por qualquer chat); o outro responde com o código dele.</small>
       </div>
 
       <h2>Console</h2>
@@ -108,6 +120,8 @@
 
   <script src="loader.js"></script>
   <script src="input.js"></script>
+  <script src="netplay.js"></script>
+  <script src="online-ui.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

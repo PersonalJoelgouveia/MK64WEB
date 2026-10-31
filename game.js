@@ -71,7 +71,12 @@
             FS.mkdir('/save');
             FS.mount(FS.filesystems.IDBFS, {}, '/save');
             Module.addRunDependency('idbfs');
-            FS.syncfs(true, (err) => { if (err) log('IDBFS: ' + err, 'warn'); Module.removeRunDependency('idbfs'); });
+            FS.syncfs(true, (err) => {
+              if (err) log('IDBFS: ' + err, 'warn');
+              // O jogo procura os .o2r no diretório de dados (SHIP_HOME=/save): links para os arquivos em memória.
+              ['mk64.o2r', 'spaghetti.o2r'].forEach((n) => { try { FS.unlink('/save/' + n); } catch (e) { /* não existia */ } FS.symlink('/' + n, '/save/' + n); });
+              Module.removeRunDependency('idbfs');
+            });
             let busy = false;
             const flush = () => { if (busy) return; busy = true; FS.syncfs(false, (e) => { busy = false; if (e) log('IDBFS: ' + e, 'warn'); }); };
             setInterval(flush, 5000);
@@ -93,6 +98,21 @@
     });
   }
 
+  // Assets prontos: jogar sozinho, ou esperar a conexão online (o jogo começa nos dois ao mesmo tempo).
+  function prepared(mk64) {
+    const N = window.MK64Net, box = document.getElementById('ready'), txt = document.getElementById('readyText');
+    let launched = false;
+    const go = (why) => { if (launched) return; launched = true; box.hidden = true; busy(true, 'Iniciando o jogo…'); launch(mk64).catch((e) => fail(String(e))); log(why, 'ok'); };
+    const armNet = () => { if (N && N.state === 'connected') { txt.textContent = 'Assets prontos. Aguardando o outro jogador…'; N.setReady(); } };
+    box.hidden = false; setStatus('Pronto', 'ok');
+    document.getElementById('btnSolo').onclick = () => go('Modo solo.');
+    if (N) {
+      N.onstart = () => go('Partida online começando.');
+      document.addEventListener('mk64:net-state', armNet);
+    }
+    armNet();
+  }
+
   async function onRom(ev) {
     const rom = ev.detail.rom, sha = ev.detail.sha1 || 'sem-sha';
     if (!window.crossOriginIsolated) return fail('Faltam cabeçalhos COOP/COEP (necessários para threads). Recarregue a página; se persistir, use HTTPS.');
@@ -107,8 +127,8 @@
         log('Assets extraídos em ' + Math.round(performance.now() - t0) + ' ms (' + (mk64.length / 1048576).toFixed(1) + ' MiB).', 'ok');
         cachePut('mk64.o2r', { sha1: sha, data: mk64 });
       }
-      setText('Iniciando o jogo…');
-      await launch(mk64);
+      busy(false);
+      prepared(mk64);
     } catch (e) { fail('Falha ao preparar o jogo: ' + (e && e.message || e)); }
   }
 
