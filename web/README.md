@@ -42,9 +42,24 @@ Aplicado sobre o commit `60c9bb7`, o mesmo submódulo fixado pelo SpaghettiKart 
 - **Ports do Emscripten** (`-sUSE_SDL=2` etc.) baixam de um servidor que pode ser bloqueado; por isso as dependências são compiladas do código-fonte.
 - **Só a ROM americana (`NKTE`) é suportada** pelo SpaghettiKart (SHA-1 `579C48E211AE952530FFC8738709F078D5DD215E`).
 
+## Sonda do código do jogo (`scripts/probe_game.sh`)
+
+Compila (sem linkar) as mesmas fontes e definições do SpaghettiKart (commit `ce0f935`) contra o `libultraship` em WASM:
+**278 de 279 unidades compilam**. A única falha é `src/port/Engine.cpp`, que inclui `Companion.h` do **Torch**.
+
+O jogo embute o Torch como biblioteca: `GameExtractor` usa `Companion` para gerar o `mk64.o2r` a partir da ROM na primeira
+execução. Portanto portar o jogo e portar o extrator de assets são a mesma tarefa. `GameExtractor.cpp` também usa APIs do
+Windows e `portable-file-dialogs`, que precisam ser trocadas por leitura de arquivo no navegador.
+
+## Licença (não confirmada)
+
+O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).
+A licença MIT encontrada em `HarbourMasters/harbourmasters-hub` é do repositório do site, não do SpaghettiKart.
+`libultraship` e `Torch` são MIT. Não publique um build WASM do jogo antes de confirmar com os mantenedores.
+
 ## Próximos passos
 
-1. Confirmar a licença do SpaghettiKart com os mantenedores (não há `LICENSE` no repositório).
-2. Compilar o jogo (`src/`, `port/`) contra esse `libultraship` e ligar o `input.js` ao `mk64_input.h`.
-3. Portar o `Torch` para gerar o `mk64.o2r` a partir da ROM no navegador.
+1. Confirmar a licença do SpaghettiKart com os mantenedores.
+2. Compilar o Torch (yaml-cpp, libgfxd, n64graphics, binarytools, GSL) para WASM e adaptar o `GameExtractor`.
+3. Linkar o jogo, ligar o `input.js` ao `mk64_input.h` e ajustar o laço principal (`emscripten_set_main_loop`).
 4. Netplay por WebRTC.
