@@ -1,8 +1,8 @@
 diff --git a/src/lib/web.cpp b/src/lib/web.cpp
-index eed9c26..2129ac0 100644
+index eed9c26..bd1fa07 100644
 --- a/src/lib/web.cpp
 +++ b/src/lib/web.cpp
-@@ -4,7 +4,7 @@
+@@ -4,13 +4,21 @@
  #include <emscripten/bind.h>
  using namespace emscripten;
  
@@ -11,7 +11,21 @@ index eed9c26..2129ac0 100644
  
  void Bind(Companion* instance) {
      Companion::Instance = instance;
-@@ -47,6 +47,7 @@ EMSCRIPTEN_BINDINGS(Torch) {
+ }
+ 
++// Cria o Companion a partir de um arquivo da ROM já gravado no sistema de arquivos virtual
++// (evita copiar 12 MiB byte a byte para um std::vector via JS).
++Companion* CreateFromFile(const std::string& rom, ArchiveType type, bool debug, bool modding, const std::string& src,
++                          const std::string& dst) {
++    return new Companion(std::filesystem::path(rom), type, debug, modding, src, dst);
++}
++
+ EMSCRIPTEN_BINDINGS(Torch) {
++    function("CreateFromFile", &CreateFromFile, allow_raw_pointers());
+     register_vector<uint8_t>("VectorUInt8");
+ 
+     function("Bind", &Bind, allow_raw_pointers());
+@@ -47,6 +55,7 @@ EMSCRIPTEN_BINDINGS(Torch) {
          .constructor<std::vector<uint8_t>, ArchiveType, bool, bool>()
          .function("Init", &Companion::Init)
          .function("GetCartridge", &Companion::GetCartridge, allow_raw_pointers())

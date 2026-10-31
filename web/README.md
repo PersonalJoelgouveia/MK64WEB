@@ -83,6 +83,17 @@ sistema de arquivos virtual antes do `main()`. Validado em Chromium: com `mk64.o
 
 **Não validado:** entrada (teclado/gamepad), áudio audível, desempenho e netplay. Há avisos `ImportTexture: null texture address` a investigar.
 
+## Página completa (`game.js`, `coi.js`, `scripts/package_site.sh`)
+
+Fluxo validado em Chromium com a ROM do dono: arrastar a ROM → `loader.js` valida (só `NKTE` + SHA-1) → `game.js` extrai o
+`mk64.o2r` com o Torch (WASM, `CreateFromFile`; ~100 s no sandbox, só na primeira vez) → guarda em IndexedDB (cache local,
+nunca enviado) → carrega `game/spaghetti_web.js` com `Module.canvas = #canvas` → o jogo renderiza no canvas da página.
+`coi.js` + `coi-sw.js` ativam COOP/COEP (necessário para threads) no GitHub Pages. `package_site.sh` copia os artefatos do
+build para `game/` (sem ROM e sem `mk64.o2r`).
+Entrada: `input.js` (teclado, gamepad, toque) é somada à do SDL em `read_controllers()` (patch em `main.c`).
+
+**Pendente:** teste de entrada real, FPS em aparelho real, salvar config/saves (IDBFS), netplay.
+
 ## Licença (não confirmada)
 
 O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).

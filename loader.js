@@ -1,7 +1,7 @@
 /* MK64 Web — loader.js
  * 1) Lê a ROM escolhida pelo usuário (100% local, nada é enviado).
  * 2) Detecta o formato (z64 / v64 / n64) e normaliza para big-endian (.z64).
- * 3) Valida o Game ID do cabeçalho (NKTE, NKTP, NKTJ).
+ * 3) Valida o Game ID do cabeçalho (somente NKTE, versão americana).
  * 4) Expõe a ROM normalizada para o módulo WASM via evento "mk64:rom-ready".
  * (A entrada — teclado, gamepad e toque — fica em input.js.)
  */
@@ -13,9 +13,9 @@
   // ---------------------------------------------------------------------------
   const VALID_IDS = {
     NKTE: 'América do Norte (NTSC-U)',
-    NKTP: 'Europa (PAL)',
-    NKTJ: 'Japão (NTSC-J)',
   };
+  // O SpaghettiKart só suporta a ROM americana (NKTE) nesta revisão exata.
+  const SUPPORTED_SHA1 = '579c48e211ae952530ffc8738709f078d5dd215e';
   const ROM_SIZE = 12 * 1024 * 1024; // Mario Kart 64 = 12 MiB (96 Mbit)
   const HEADER_SIZE = 0x40;
   const ID_OFFSET = 0x3B;            // 'N' + 'KT' + região (4 bytes)
@@ -157,6 +157,9 @@
     }
 
     const sha1 = await sha1Hex(bytes.buffer);
+    if (sha1 && sha1 !== SUPPORTED_SHA1) {
+      return { ok: false, error: 'ROM americana (NKTE) de revisão não suportada (SHA-1 ' + sha1 + '). É necessária a revisão 1.0 (SHA-1 ' + SUPPORTED_SHA1 + ').' };
+    }
     return { ok: true, rom: bytes, id, region: VALID_IDS[id], title, format, sha1 };
   }
 
@@ -203,7 +206,6 @@
       rom: result.rom, romId: result.id, romRegion: result.region, romSha1: result.sha1,
     });
     window.dispatchEvent(new CustomEvent('mk64:rom-ready', { detail: result }));
-    log('Aguardando módulo WASM (ainda não implementado).', 'warn');
   }
 
   function resetRom() {
@@ -246,8 +248,8 @@
   // Boot
   // ---------------------------------------------------------------------------
   window.MK64Log = log; // usado por input.js
-  log('MK64 Web iniciado. Selecione sua ROM (NKTE, NKTP ou NKTJ).');
+  log('MK64 Web iniciado. Selecione sua ROM americana (NKTE).');
 
   // Exposto para testes/depuração e para o módulo WASM
-  window.MK64Loader = { validateRom, normalizeToZ64, detectFormat, VALID_IDS };
+  window.MK64Loader = { SUPPORTED_SHA1, validateRom, normalizeToZ64, detectFormat, VALID_IDS };
 })();

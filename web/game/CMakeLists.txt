@@ -24,7 +24,7 @@ include($ENV{LUS_DIR}/cmake/cvars.cmake)   # macros CVAR_* usadas pelo jogo
 add_executable(spaghetti_web ${FILES})
 set_property(TARGET spaghetti_web PROPERTY CXX_STANDARD 20)
 set_property(TARGET spaghetti_web PROPERTY C_STANDARD 11)
-target_include_directories(spaghetti_web PRIVATE ${SK} ${SK}/include ${SK}/include/assets ${SK}/src
+target_include_directories(spaghetti_web PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src ${SK} ${SK}/include ${SK}/include/assets ${SK}/src
   $ENV{LUS_DIR}/include $ENV{LUS_DIR}/include/libultraship $ENV{LUS_DIR}/include/ship
   ${S}/dr_libs ${S}/tomlplusplus/include ${S}/semver/include
   ${S}/../src/thread-pool/include ${S}/../src/imgui ${S}/../src/imgui/backends ${S}/../src/stb

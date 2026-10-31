@@ -1,3 +1,32 @@
+diff --git a/src/main.c b/src/main.c
+index 1bdbee6e1..42560a81d 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -39,6 +39,9 @@
+ #include "engine/wasm.h"
+ #include "port/Game.h"
+ #include "port/Engine.h"
++#ifdef __EMSCRIPTEN__
++#include "web/mk64_input.h"
++#endif
+ #include "engine/Matrix.h"
+ #include "engine/TrackBrowser.h"
+ 
+@@ -395,6 +398,14 @@ void read_controllers(void) {
+     osContStartReadData(&gSIEventMesgQueue);
+     // osRecvMesg(&gSIEventMesgQueue, &msg, OS_MESG_BLOCK);
+     osContGetReadData(gControllerPads);
++#ifdef __EMSCRIPTEN__
++    {   /* entrada vinda do input.js (teclado/gamepad/toque), somada à do SDL */
++        uint16_t b; int8_t sx, sy;
++        mk64_read_pad(0, &b, &sx, &sy);
++        gControllerPads[0].button |= b;
++        if (sx != 0 || sy != 0) { gControllerPads[0].stick_x = sx; gControllerPads[0].stick_y = sy; }
++    }
++#endif
+     update_controller(0);
+     update_controller(1);
+     update_controller(2);
 diff --git a/src/port/Engine.cpp b/src/port/Engine.cpp
 index 23036adcb..f8975e5a3 100644
 --- a/src/port/Engine.cpp
