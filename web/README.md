@@ -72,7 +72,13 @@ Compila e **linka** o SpaghettiKart (`ce0f935`) com o `libultraship`: `spaghetti
 - `framebuffer_effects.c`: declara `gfx_create_framebuffer` com o 6º parâmetro (`forceFixedAspect`) que o libultraship tem.
   Em C nativo a diferença passa; em WASM é erro de assinatura (chamada que falha em execução).
 
-**Não validado:** execução do jogo (precisa de `mk64.o2r` + `spaghetti.o2r` no sistema de arquivos virtual).
+- `Game.cpp`: no Emscripten o `while (WindowIsRunning()) push_frame();` vira `emscripten_set_main_loop` (a página não bloqueia).
+  `PROXY_TO_PTHREAD` não serve aqui: o EGL do Emscripten cria o contexto GL na thread principal.
+
+`scripts/pack_spaghetti.py` gera o `spaghetti.o2r` (zip de `assets/`, igual ao `torch pack`); `game/prerun.js` o carrega no
+sistema de arquivos virtual antes do `main()`. Validado em Chromium: o jogo lê o `spaghetti.o2r`, inicializa o motor e o laço roda.
+
+**Não validado:** o jogo com o `mk64.o2r` (depende da sua ROM).
 
 ## Licença (não confirmada)
 
