@@ -51,6 +51,18 @@ O jogo embute o Torch como biblioteca: `GameExtractor` usa `Companion` para gera
 execução. Portanto portar o jogo e portar o extrator de assets são a mesma tarefa. `GameExtractor.cpp` também usa APIs do
 Windows e `portable-file-dialogs`, que precisam ser trocadas por leitura de arquivo no navegador.
 
+## Torch em WebAssembly (`scripts/build_torch.sh`)
+
+O Torch (extrator de assets) já traz suporte a Emscripten no CMake e bindings JavaScript (`src/lib/web.cpp`):
+`Companion` aceita os bytes da ROM e gera o `.o2r`. No commit fixado pelo SpaghettiKart (`2d474dd`) o link falhava por
+`Companion::Instance` definido duas vezes; `patches/torch-emscripten.patch` corrige com uma linha.
+
+Resultado: `torch.js` + `torch.wasm` (2,1 MB, módulo ES6, sem pthreads). Validado em Chromium: `createModule()` carrega e expõe
+`Companion`, `ExportType`, `ArchiveType`, `VectorUInt8` e `FS`.
+
+**Não validado:** a extração de fato (exige uma ROM `NKTE` e os arquivos `yamls/` + `config.yml` + `meta/mods.toml` do
+SpaghettiKart no sistema de arquivos virtual). Isso precisa ser testado com a sua ROM.
+
 ## Licença (não confirmada)
 
 O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).
@@ -59,7 +71,8 @@ A licença MIT encontrada em `HarbourMasters/harbourmasters-hub` é do repositó
 
 ## Próximos passos
 
-1. Confirmar a licença do SpaghettiKart com os mantenedores.
-2. Compilar o Torch (yaml-cpp, libgfxd, n64graphics, binarytools, GSL) para WASM e adaptar o `GameExtractor`.
+1. Testar a extração (Torch web) com a ROM, no navegador, gerando o `mk64.o2r`.
+2. Substituir `GameExtractor.cpp` (APIs do Windows e diálogos) por leitura do `.o2r` já gerado no sistema de arquivos virtual.
 3. Linkar o jogo, ligar o `input.js` ao `mk64_input.h` e ajustar o laço principal (`emscripten_set_main_loop`).
 4. Netplay por WebRTC.
+5. Licença do SpaghettiKart: sem resposta dos mantenedores; uso próprio, com a ROM do dono.

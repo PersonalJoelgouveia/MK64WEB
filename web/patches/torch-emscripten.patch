@@ -1,0 +1,13 @@
+diff --git a/src/lib/web.cpp b/src/lib/web.cpp
+index eed9c26..8bfdc53 100644
+--- a/src/lib/web.cpp
++++ b/src/lib/web.cpp
+@@ -4,7 +4,7 @@
+ #include <emscripten/bind.h>
+ using namespace emscripten;
+ 
+-Companion* Companion::Instance;
++// Companion::Instance já é definido em Companion.cpp
+ 
+ void Bind(Companion* instance) {
+     Companion::Instance = instance;

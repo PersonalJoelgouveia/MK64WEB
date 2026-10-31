@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>torch</title>
+<script type="module">
+import createModule from './torch.js';
+try {
+  const m = await createModule({ print: t => console.log('[torch]', t), printErr: t => console.log('[torch:err]', t) });
+  console.log('COMPANION', typeof m.Companion, 'ExportType', typeof m.ExportType, 'FS', typeof m.FS, 'VectorUInt8', typeof m.VectorUInt8);
+  console.log('ArchiveType.O2R', m.ArchiveType && m.ArchiveType.O2R && m.ArchiveType.O2R.value);
+  console.log('FIM_OK');
+} catch (e) { console.log('ERRO', e && (e.message || e)); }
+</script>
