@@ -18,7 +18,7 @@ rm -rf "$WORK/build-torch"
 # fixes.cmake adiciona -fexceptions (o CMakeLists do Torch sobrescreve CMAKE_CXX_FLAGS).
 "$EMCMAKE" cmake -S "$TORCH" -B "$WORK/build-torch" -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DUSE_STANDALONE=ON -DBUILD_STORMLIB=OFF -DBUILD_SM64=OFF -DBUILD_SF64=OFF -DBUILD_FZERO=OFF -DBUILD_MARIO_ARTIST=OFF \
-  -DBUILD_MK64=ON -DBUILD_NAUDIO=ON -DCMAKE_PROJECT_INCLUDE="$HERE/torch/fixes.cmake"
+  -DBUILD_MK64=ON -DBUILD_NAUDIO=ON -DCMAKE_EXE_LINKER_FLAGS="-sEXPORT_EXCEPTION_HANDLING_HELPERS" -DCMAKE_PROJECT_INCLUDE="$HERE/torch/fixes.cmake"
 cmake --build "$WORK/build-torch" -j"$(nproc)"
 cp "$HERE/torch/torch_test.html" "$WORK/build-torch/"
 ls -la "$WORK"/build-torch/torch.js "$WORK"/build-torch/torch.wasm

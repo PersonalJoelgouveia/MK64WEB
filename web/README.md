@@ -60,8 +60,11 @@ O Torch (extrator de assets) já traz suporte a Emscripten no CMake e bindings J
 Resultado: `torch.js` + `torch.wasm` (2,1 MB, módulo ES6, sem pthreads). Validado em Chromium: `createModule()` carrega e expõe
 `Companion`, `ExportType`, `ArchiveType`, `VectorUInt8` e `FS`.
 
-**Não validado:** a extração de fato (exige uma ROM `NKTE` e os arquivos `yamls/` + `config.yml` + `meta/mods.toml` do
-SpaghettiKart no sistema de arquivos virtual). Isso precisa ser testado com a sua ROM.
+**Extração validada** (Chromium, ROM `NKTE` do dono, SHA-1 `579C48E2…`): `torch/extract_test.html` + `scripts/run_extract.js` geram
+`mk64.o2r` (26,7 MB, 32.447 arquivos) em ~2 s. Requisitos no sistema de arquivos virtual: `yamls/`, `config.yml`,
+`include/defines.h` e `meta/mods.toml`. Pontos: o construtor do `Companion` precisa dos 6 argumentos
+`(rom, O2R, false, false, '/sk', '/out')`; depois `SetAdditionalFile('meta/mods.toml')` (binding adicionado pelo patch), `Init(Binary)` e `Process()`.
+`EXPORT_EXCEPTION_HANDLING_HELPERS` expõe `getExceptionMessage` para ler erros C++.
 
 ## Jogo completo em WASM (`scripts/build_game.sh`)
 
@@ -76,9 +79,9 @@ Compila e **linka** o SpaghettiKart (`ce0f935`) com o `libultraship`: `spaghetti
   `PROXY_TO_PTHREAD` não serve aqui: o EGL do Emscripten cria o contexto GL na thread principal.
 
 `scripts/pack_spaghetti.py` gera o `spaghetti.o2r` (zip de `assets/`, igual ao `torch pack`); `game/prerun.js` o carrega no
-sistema de arquivos virtual antes do `main()`. Validado em Chromium: o jogo lê o `spaghetti.o2r`, inicializa o motor e o laço roda.
+sistema de arquivos virtual antes do `main()`. Validado em Chromium: com `mk64.o2r` + `spaghetti.o2r` o jogo carrega bancos/sequências de áudio e **renderiza a corrida (demo do Mario Raceway)** em WebGL2.
 
-**Não validado:** o jogo com o `mk64.o2r` (depende da sua ROM).
+**Não validado:** entrada (teclado/gamepad), áudio audível, desempenho e netplay. Há avisos `ImportTexture: null texture address` a investigar.
 
 ## Licença (não confirmada)
 

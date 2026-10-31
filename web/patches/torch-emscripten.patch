@@ -1,5 +1,5 @@
 diff --git a/src/lib/web.cpp b/src/lib/web.cpp
-index eed9c26..8bfdc53 100644
+index eed9c26..2129ac0 100644
 --- a/src/lib/web.cpp
 +++ b/src/lib/web.cpp
 @@ -4,7 +4,7 @@
@@ -11,3 +11,11 @@ index eed9c26..8bfdc53 100644
  
  void Bind(Companion* instance) {
      Companion::Instance = instance;
+@@ -47,6 +47,7 @@ EMSCRIPTEN_BINDINGS(Torch) {
+         .constructor<std::vector<uint8_t>, ArchiveType, bool, bool>()
+         .function("Init", &Companion::Init)
+         .function("GetCartridge", &Companion::GetCartridge, allow_raw_pointers())
++        .function("SetAdditionalFile", optional_override([](Companion& c, const std::string& f) { c.SetAdditionalFiles({ f }); }))
+         .function("Process", &Companion::Process)
+         .function("GetRomData", &Companion::GetRomData, allow_raw_pointers());
+ }

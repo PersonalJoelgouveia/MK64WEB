@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>extract</title>
+<script type="module">
+import createModule from './torch.js';
+const log = (...a) => console.log(...a);
+try {
+  const m = await createModule({ print: t => log('[torch]', t), printErr: t => log('[torch:err]', t) });
+  const FS = m.FS; window.__m = m;
+  const mk = p => { let c=''; p.split('/').slice(0,-1).forEach(s => { c += '/'+s; try { FS.mkdir(c) } catch(e){} }); };
+  const files = (await (await fetch('manifest.txt')).text()).trim().split('\n');
+  for (const f of files) { mk('/sk/'+f); FS.writeFile('/sk/'+f, new Uint8Array(await (await fetch('sk/'+f)).arrayBuffer())); }
+  const rom = new Uint8Array(await (await fetch('mk64.z64')).arrayBuffer());
+  const v = new m.VectorUInt8(); v.resize(rom.length, 0); for (let i=0;i<rom.length;i++) v.set(i, rom[i]);
+  log('ROM carregada', rom.length);
+  const t0 = performance.now();
+  const c = new m.Companion(v, m.ArchiveType.O2R, false, false, '/sk', '/out');
+  m.Bind(c);
+  c.SetAdditionalFile('meta/mods.toml'); c.Init(m.ExportType.Binary);
+  {const ct=c.GetCartridge(); if(ct) log('CART', ct.GetGameTitle(), ct.GetCountry(), ct.GetHash()); else log('CART nulo');} c.Process(); log('PROCESS ms', Math.round(performance.now()-t0));
+  const walk = (d) => FS.readdir(d).filter(n=>n!='.'&&n!='..').forEach(n => { const p=d+'/'+n; const s=FS.stat(p); log('FS', p, FS.isDir(s.mode)?'<dir>':s.size); if (FS.isDir(s.mode)) walk(p); });
+  try { walk('/out'); } catch(e) { log('sem /out', e.message); }
+  try { walk('/sk').length; } catch(e){}
+  window.__done = true; log('FIM_OK');
+} catch (e) { let msg=''; try{ const m=window.__m; msg = m.getExceptionMessage ? m.getExceptionMessage(e).join(' | ') : ''; }catch(x){msg='(sem getExceptionMessage)'} log('ERRO', e && (e.stack || e.message || e), msg); }
+</script>
