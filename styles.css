@@ -366,3 +366,4 @@ kbd {
 }
 .ready[hidden] { display: none; }
 .ready small { color: var(--muted, #9aa3b2); max-width: 34ch; line-height: 1.4; }
+.online .field[hidden] { display: none; }

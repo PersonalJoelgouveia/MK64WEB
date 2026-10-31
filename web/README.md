@@ -99,6 +99,18 @@ Testado: reabrir o navegador mantém `/save` e o `mk64.o2r` em cache (sem reextr
 
 **Pendente:** teste de entrada real, FPS em aparelho real, netplay.
 
+## Multiplayer (`netplay.js`, `online-ui.js`, `game/webnet.c`)
+
+WebRTC P2P com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam (DataChannel confiável). Anfitrião =
+jogador 1 (porta 0), convidado = jogador 2 (porta 1); atraso fixo de 4 quadros; um quadro lógico só avança quando o comando do
+outro jogador chegou. A sinalização é manual (códigos copiar/colar, ~600 caracteres), sem servidor. Os dois só começam quando
+ambos têm os assets prontos (`READY`), para partirem do mesmo estado. A cada 60 quadros trocam um hash (RNG, `gGlobalTimer`,
+posição/velocidade dos 2 primeiros jogadores) e a página avisa se divergirem.
+Hooks: `Game.cpp` (laço só avança com `mk64_net_can_tick()`) e `main.c` (`read_controllers`).
+Validado no Chromium com 2 abas: conexão, partida iniciada, ~670 quadros em sincronia, nenhuma dessincronização.
+**Não validado:** entre dois aparelhos/redes reais (STUN público, NAT simétrico precisaria de TURN), controle do jogador 2 em corrida,
+latência alta (o jogo trava esperando o outro), 3–4 jogadores.
+
 ## Licença (não confirmada)
 
 O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).
