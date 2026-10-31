@@ -63,6 +63,17 @@ Resultado: `torch.js` + `torch.wasm` (2,1 MB, módulo ES6, sem pthreads). Valida
 **Não validado:** a extração de fato (exige uma ROM `NKTE` e os arquivos `yamls/` + `config.yml` + `meta/mods.toml` do
 SpaghettiKart no sistema de arquivos virtual). Isso precisa ser testado com a sua ROM.
 
+## Jogo completo em WASM (`scripts/build_game.sh`)
+
+Compila e **linka** o SpaghettiKart (`ce0f935`) com o `libultraship`: `spaghetti_web.{html,js,wasm}` (~7,9 MB), sem avisos.
+`patches/spaghettikart-emscripten.patch`:
+
+- `Engine.cpp`: no Emscripten não usa `GameExtractor` (Windows/diálogos); sem `mk64.o2r` apenas registra erro.
+- `framebuffer_effects.c`: declara `gfx_create_framebuffer` com o 6º parâmetro (`forceFixedAspect`) que o libultraship tem.
+  Em C nativo a diferença passa; em WASM é erro de assinatura (chamada que falha em execução).
+
+**Não validado:** execução do jogo (precisa de `mk64.o2r` + `spaghetti.o2r` no sistema de arquivos virtual).
+
 ## Licença (não confirmada)
 
 O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).
