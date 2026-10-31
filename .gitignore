@@ -40,3 +40,8 @@ Thumbs.db
 
 # Build WebAssembly (web/)
 web/.build/
+
+# Artefatos do site publicados em game/ (o mk64.o2r NUNCA: é gerado no navegador a partir da ROM do usuário)
+!game/*.wasm
+!game/spaghetti.o2r
+game/mk64.o2r
