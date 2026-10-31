@@ -76,6 +76,23 @@ index ad9b1dd..f6c06b9 100644
      glewInit();
  #endif
  
+diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
+index 04dff04..e12effc 100644
+--- a/src/fast/interpreter.cpp
++++ b/src/fast/interpreter.cpp
+@@ -3980,6 +3980,12 @@ bool gfx_set_timg_handler_rdp(F3DGfx** cmd0) {
+                              reinterpret_cast<LPCSTR>(i), &module))) {
+         return false;
+     }
++#elif defined(__EMSCRIPTEN__)
++    // wasm32: todo ponteiro válido da memória linear fica abaixo de 0x10000000, então o teste de "faixa segmentada"
++    // descartaria texturas reais. Um endereço segmentado não resolvido tem o bit 0 ligado (ver SegAddr).
++    if (i < 0x10000 || (i <= 0x0FFFFFFF && (i & 1))) {
++        return false;
++    }
+ #else
+     if (i <= 0x0FFFFFFF) {
+         return false;
 diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
 index 361a1f7..25666b5 100644
 --- a/src/ship/Context.cpp

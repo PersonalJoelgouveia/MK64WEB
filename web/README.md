@@ -32,6 +32,9 @@ Aplicado sobre o commit `60c9bb7`, o mesmo submódulo fixado pelo SpaghettiKart 
 - `cmake/dependencies/emscripten.cmake` (novo): liga SDL2 ao ImGui e exige `USE_OPENGLES=ON` (WebGL2).
 - `src/CMakeLists.txt`: não procura `GLESv2` no Emscripten (o `emcc` fornece o WebGL).
 - `gfx_opengl.cpp`: não chama `glewInit()` no Emscripten.
+- `interpreter.cpp` (`gfx_set_timg_handler_rdp`): o teste "endereço ≤ 0x0FFFFFFF = segmento não resolvido" descartava texturas reais, pois em wasm32 todo
+  ponteiro da memória linear fica abaixo de 256 MB (sintoma: karts e personagens invisíveis). No Emscripten só rejeita endereços
+  segmentados não resolvidos (bit 0 ligado) ou < 0x10000.
 - `common.cmake`: aceita `LUS_STB_IMAGE_H` em vez de baixar o stb por `file(DOWNLOAD)`.
 
 ## Pontos de atenção
