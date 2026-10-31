@@ -65,6 +65,19 @@
         locateFile: (n) => GAME_DIR + n,
         print: (t) => log(t), printErr: (t) => log(t),
         preRun: [() => {
+          // Persistência: config e saves em /save (IndexedDB). Carrega antes do main() e grava periodicamente.
+          const FS = Module.FS;
+          try {
+            FS.mkdir('/save');
+            FS.mount(FS.filesystems.IDBFS, {}, '/save');
+            Module.addRunDependency('idbfs');
+            FS.syncfs(true, (err) => { if (err) log('IDBFS: ' + err, 'warn'); Module.removeRunDependency('idbfs'); });
+            let busy = false;
+            const flush = () => { if (busy) return; busy = true; FS.syncfs(false, (e) => { busy = false; if (e) log('IDBFS: ' + e, 'warn'); }); };
+            setInterval(flush, 5000);
+            document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+            window.addEventListener('pagehide', flush);
+          } catch (e) { log('Persistência indisponível: ' + e, 'warn'); }
           Module.FS.writeFile('/mk64.o2r', mk64);
           Module.FS.writeFile('/spaghetti.o2r', new Uint8Array(sp));
         }],

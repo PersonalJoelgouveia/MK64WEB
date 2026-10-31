@@ -76,3 +76,16 @@ index ad9b1dd..f6c06b9 100644
      glewInit();
  #endif
  
+diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
+index 361a1f7..25666b5 100644
+--- a/src/ship/Context.cpp
++++ b/src/ship/Context.cpp
+@@ -564,7 +564,7 @@ std::string Context::GetAppDirectoryPath(const std::string& appName) {
+     }
+ #endif
+ 
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__EMSCRIPTEN__)
+     char* fpath = std::getenv("SHIP_HOME");
+     if (fpath != NULL) {
+         return std::string(fpath);

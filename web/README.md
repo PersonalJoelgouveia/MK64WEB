@@ -92,7 +92,12 @@ nunca enviado) → carrega `game/spaghetti_web.js` com `Module.canvas = #canvas`
 build para `game/` (sem ROM e sem `mk64.o2r`).
 Entrada: `input.js` (teclado, gamepad, toque) é somada à do SDL em `read_controllers()` (patch em `main.c`).
 
-**Pendente:** teste de entrada real, FPS em aparelho real, salvar config/saves (IDBFS), netplay.
+**Persistência (validada):** `/save` é montado como IDBFS no `game.js` (carrega antes do `main()`, grava a cada 5 s e ao
+esconder/fechar a página). O jogo recebe `SHIP_HOME=/save` (`Game.cpp`); no libultraship o patch faz `Context.cpp` honrar
+`SHIP_HOME` também no Emscripten. Config (`spaghettify.cfg.json`), logs e saves ficam em `/save`; os `.o2r` ficam fora (memória).
+Testado: reabrir o navegador mantém `/save` e o `mk64.o2r` em cache (sem reextrair).
+
+**Pendente:** teste de entrada real, FPS em aparelho real, netplay.
 
 ## Licença (não confirmada)
 

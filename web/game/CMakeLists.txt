@@ -42,5 +42,5 @@ target_link_options(spaghetti_web PRIVATE
   -pthread -fexceptions -sUSE_WEBGL2=1 -sFULL_ES3=1 -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=536870912 -sMAXIMUM_MEMORY=2147483648 -sPTHREAD_POOL_SIZE=8
   -sASSERTIONS=1 -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1 -sSTACK_SIZE=2097152
-  -sEXPORTED_RUNTIME_METHODS=FS,callMain -lidbfs.js)
+  -sEXPORTED_RUNTIME_METHODS=FS,callMain,addRunDependency,removeRunDependency -lidbfs.js)
 target_link_options(spaghetti_web PRIVATE --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/prerun.js)
