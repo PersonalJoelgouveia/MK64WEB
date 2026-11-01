@@ -1,0 +1,9 @@
+{
+  "name": "mk64web-signaling",
+  "version": "1.0.0",
+  "description": "Servidor de salas e sinalização WebRTC para o MK64 Web (não trafega dados do jogo)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "license": "MIT"
+}

@@ -92,21 +92,39 @@
 
       <h2>Online</h2>
       <div class="online" id="online">
-        <div class="online-actions">
-          <button class="btn" id="btnHost" type="button">Criar sala</button>
-          <button class="btn btn-ghost" id="btnJoin" type="button">Entrar</button>
+        <div id="viewServer">
+          <div class="field"><label for="srvUrl">Servidor de salas</label>
+            <input id="srvUrl" type="text" placeholder="wss://seu-servidor.exemplo" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="srvToken">Chave de acesso (se o servidor for fechado)</label>
+            <input id="srvToken" type="password" autocomplete="off"></div>
+          <div class="field"><label for="nick">Seu apelido</label>
+            <input id="nick" type="text" maxlength="20" placeholder="Jogador"></div>
+          <button class="btn" id="btnConnect" type="button">Conectar</button>
         </div>
-        <div class="field" id="fieldMine" hidden>
-          <label for="codeMine" id="lblMine">Seu código</label>
-          <textarea id="codeMine" rows="3" readonly></textarea>
-          <button class="btn btn-ghost" id="btnCopy" type="button">Copiar código</button>
+        <div id="viewLobby" hidden>
+          <div class="online-actions">
+            <button class="btn btn-ghost" id="btnRefresh" type="button">Atualizar</button>
+            <button class="btn btn-ghost" id="btnDisconnect" type="button">Sair do servidor</button>
+          </div>
+          <ul class="rooms" id="roomList"></ul>
+          <details class="newroom"><summary>Criar sala</summary>
+            <div class="field"><label for="rmName">Nome da sala</label><input id="rmName" type="text" maxlength="32"></div>
+            <div class="field"><label for="rmPass">Senha (opcional)</label><input id="rmPass" type="password" maxlength="40" autocomplete="off"></div>
+            <div class="field"><label for="rmMax">Jogadores (2 a 4)</label>
+              <select id="rmMax"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+            <button class="btn" id="btnCreate" type="button">Criar</button>
+          </details>
         </div>
-        <div class="field" id="fieldTheirs" hidden>
-          <label for="codeTheirs" id="lblTheirs">Código do outro jogador</label>
-          <textarea id="codeTheirs" rows="3" spellcheck="false"></textarea>
-          <button class="btn" id="btnApply" type="button">Conectar</button>
+        <div id="viewRoom" hidden>
+          <p class="room-title" id="roomTitle"></p>
+          <ul class="players" id="playerList"></ul>
+          <div class="online-actions">
+            <button class="btn" id="btnStart" type="button" hidden>Iniciar partida</button>
+            <button class="btn btn-ghost" id="btnLeave" type="button">Sair da sala</button>
+          </div>
         </div>
-        <small id="netStatus">Sem conexão. Um cria a sala e envia o código ao outro (por qualquer chat); o outro responde com o código dele.</small>
+        <small id="netStats" class="net-stats"></small>
+        <small id="netStatus">Informe o servidor de salas (ele só organiza as salas; o jogo roda direto entre os navegadores).</small>
       </div>
 
       <h2>Console</h2>
@@ -120,6 +138,7 @@
 
   <script src="loader.js"></script>
   <script src="input.js"></script>
+  <script src="config.js"></script>
   <script src="netplay.js"></script>
   <script src="online-ui.js"></script>
   <script src="game.js"></script>

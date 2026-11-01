@@ -102,24 +102,21 @@ Testado: reabrir o navegador mantém `/save` e o `mk64.o2r` em cache (sem reextr
 
 **Pendente:** teste de entrada real, FPS em aparelho real, netplay.
 
-## Multiplayer (`netplay.js`, `online-ui.js`, `game/webnet.c`)
+## Multiplayer (`netplay.js`, `online-ui.js`, `game/webnet.c`, `server/`)
 
-WebRTC P2P com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam (DataChannel confiável). Anfitrião =
-jogador 1 (porta 0), convidado = jogador 2 (porta 1); atraso fixo de 4 quadros; um quadro lógico só avança quando o comando do
-outro jogador chegou. A sinalização é manual (códigos copiar/colar, ~600 caracteres), sem servidor. Os dois só começam quando
-ambos têm os assets prontos (`READY`), para partirem do mesmo estado. A cada 60 quadros trocam um hash (RNG, `gGlobalTimer`,
-posição/velocidade dos 2 primeiros jogadores) e a página avisa se divergirem.
-Hooks: `Game.cpp` (laço só avança com `mk64_net_can_tick()`) e `main.c` (`read_controllers`).
-Validado no Chromium com 2 abas: conexão, partida iniciada, ~670 quadros em sincronia, nenhuma dessincronização.
-**Não validado:** entre dois aparelhos/redes reais (STUN público, NAT simétrico precisaria de TURN), controle do jogador 2 em corrida,
-latência alta (o jogo trava esperando o outro), 3–4 jogadores.
-
-## Desempenho
-
-Build do jogo em `-O2` (compilação e link; o link com `-O` roda o `wasm-opt`), `-sASSERTIONS=0` e `-sMALLOC=mimalloc`
-(o alocador padrão usa um lock global e pesa com várias threads). Validado só quanto à corretude (a corrida renderiza igual);
-o ganho de FPS não foi medido (o sandbox renderiza por software). Pontos restantes: compilação de shaders sob demanda (engasgos
-na primeira vez que um efeito aparece) e custo do Fast3D na thread principal.
+2 a 4 jogadores (o jogo tem no máximo 4 humanos: 3P/4P em tela dividida). WebRTC **em malha** (cada jogador ligado direto aos
+outros) com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam. Salas (lista, senha, chave de acesso do
+servidor fechado) ficam em `server/server.js` (Node + `ws`), que só encaminha a sinalização; ver `server/README.md`.
+Anfitrião = quem cria a sala = jogador 1; só ele inicia, quando todos estão com os assets prontos.
+Contra o lag: comandos em canal **não confiável** com redundância de 8 quadros (perda não trava; pede reenvio pelo canal
+confiável se faltar >100 ms), atraso de entrada adaptativo medido por ping de todos, "catch-up" de até 3 quadros por quadro de
+tela, telemetria no painel. Se um jogador sai durante a partida o sincronismo termina. Hash do estado (RNG, `gGlobalTimer`,
+posição/velocidade dos 4 jogadores) a cada 60 quadros detecta dessincronização.
+Hooks: `Game.cpp` (laço) e `main.c` (`read_controllers`). **Som desligado** no navegador (`Engine.cpp`: sem síntese de áudio nem
+espera da thread principal por ela).
+Validado no Chromium: servidor com chave/senha/lista, malha de 4 jogadores com lockstep (comandos de todos os slots corretos,
+sem dessincronização), e 2 jogadores com o jogo real. **Não validado:** 3–4 jogadores com o jogo real, perda de pacotes, redes reais,
+TURN, jogador saindo no meio da partida (apenas encerra).
 
 ## Licença (não confirmada)
 

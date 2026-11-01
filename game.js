@@ -98,19 +98,24 @@
     });
   }
 
-  // Assets prontos: jogar sozinho, ou esperar a conexão online (o jogo começa nos dois ao mesmo tempo).
+  // Assets prontos: jogar sozinho, ou esperar a partida online (o anfitrião inicia; começa nos dois ao mesmo tempo).
   function prepared(mk64) {
     const N = window.MK64Net, box = document.getElementById('ready'), txt = document.getElementById('readyText');
     let launched = false;
     const go = (why) => { if (launched) return; launched = true; box.hidden = true; busy(true, 'Iniciando o jogo…'); launch(mk64).catch((e) => fail(String(e))); log(why, 'ok'); };
-    const armNet = () => { if (N && N.state === 'connected') { txt.textContent = 'Assets prontos. Aguardando o outro jogador…'; N.setReady(); } };
+    const sync = () => {
+      if (!N || launched) return;
+      const inRoom = N.state === 'inroom';
+      if (inRoom && !N.localReady) N.setReady(true);
+      txt.textContent = inRoom ? 'Assets prontos. Aguardando o anfitrião iniciar a partida…' : 'Assets prontos.';
+    };
     box.hidden = false; setStatus('Pronto', 'ok');
-    document.getElementById('btnSolo').onclick = () => go('Modo solo.');
+    document.getElementById('btnSolo').onclick = () => { if (N && N.state === 'inroom') N.leaveRoom(); go('Modo solo.'); };
     if (N) {
       N.onstart = () => go('Partida online começando.');
-      document.addEventListener('mk64:net-state', armNet);
+      const prev = N.onchange; N.onchange = () => { if (prev) prev(); sync(); };
     }
-    armNet();
+    sync();
   }
 
   async function onRom(ev) {
