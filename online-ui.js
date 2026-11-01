@@ -75,7 +75,7 @@
     N.joinRoom(b.dataset.id, pass, nick());
   });
 
-  const inServerMode = () => !!(N.room && N.room.locked !== undefined);
+  const inServerMode = () => N.mode === 'server';
   function render() {
     const inRoom = N.state === 'inroom' || N.state === 'playing', inServer = N.state === 'lobby';
     show('viewServer', !inServer); show('viewLobby', inServer && !inRoom); show('viewRoom', inRoom);
@@ -96,8 +96,8 @@
       const host = N.me && N.me.slot === 0;
       show('btnStart', host && N.state === 'inroom');
       const full = N.room && N.peers.length >= N.room.max;
-      show('btnShare', host && N.state === 'inroom' && !!$('srvUrl').value.trim() && inServerMode());
-      show('inviteBox', host && N.state === 'inroom' && !full);
+      show('btnShare', host && N.state === 'inroom' && inServerMode());
+      show('inviteBox', host && N.state === 'inroom' && !full && N.mode === 'host');
       if (inviteId && N.peers.length && !host === false && N.peers.some((p) => p.id === inviteId)) { inviteId = null; show('inviteStep', false); }
       $('btnStart').disabled = !N.canStart();
       if (N.state === 'inroom') {

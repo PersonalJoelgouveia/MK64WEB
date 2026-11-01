@@ -25,6 +25,7 @@
   const log = (m, k) => (window.MK64Log || console.log)('[online] ' + m, k);
 
   const N = {
+    get mode() { return mode; },
     state: 'idle',            // idle | connecting | lobby | inroom | playing | closed
     me: null, room: null, peers: [], rooms: [], active: false, mask: 0,
     tick: 0, delay: DEFAULT_DELAY, stalls: 0, desync: null, localReady: false,
