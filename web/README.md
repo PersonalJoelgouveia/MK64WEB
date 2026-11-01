@@ -135,3 +135,8 @@ A licença MIT encontrada em `HarbourMasters/harbourmasters-hub` é do repositó
 3. Linkar o jogo, ligar o `input.js` ao `mk64_input.h` e ajustar o laço principal (`emscripten_set_main_loop`).
 4. Netplay por WebRTC.
 5. Licença do SpaghettiKart: sem resposta dos mantenedores; uso próprio, com a ROM do dono.
+
+### Atraso adaptativo durante a partida
+O atraso de entrada é **por remetente** (não precisa ser igual em todos). Quem fica esperando o comando de um jogador conta as esperas
+por origem e, a cada segundo, pede a ele +1/+2/+3 quadros (`C.DELAY`); ele preenche os quadros que faltam e segue. Sem pedidos por
+10 s o atraso desce 1 quadro a cada 8 s (mín. 4, máx. 16). Assim só o jogador de rede ruim paga mais atraso; os demais ficam fluidos.

@@ -17,10 +17,10 @@
  */
 (function () {
   'use strict';
-  const FRAME_MS = 1000 / 60, MIN_DELAY = 4, MAX_DELAY = 12, DEFAULT_DELAY = 6, MAXP = 4;
+  const FRAME_MS = 1000 / 60, MIN_DELAY = 4, MAX_DELAY = 16, DEFAULT_DELAY = 6, MAXP = 4;
   const HASH_EVERY = 60, REDUNDANCY = 8, MAX_CATCHUP = 3, CATCHUP_BUDGET_MS = 9, NEED_AFTER_MS = 100;
   const U = { INPUT: 1, PING: 2, PONG: 3 };                          // canal "in" (não confiável)
-  const C = { ASK: 1, REPORT: 2, GO: 3, HASH: 4, NEED: 5, BULK: 6, JSON: 7 }; // canal "ctl" (confiável)
+  const C = { ASK: 1, REPORT: 2, GO: 3, HASH: 4, NEED: 5, BULK: 6, JSON: 7, DELAY: 8 }; // canal "ctl" (confiável)
   const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
   const log = (m, k) => (window.MK64Log || console.log)('[online] ' + m, k);
 
@@ -33,6 +33,7 @@
     onchange: null, onerror: null, onstart: null, ondrop: null, ondesync: null,
   };
   let ws = null, conns = new Map(), inputs, sent, myHash, peerHash, submitted, frameStart = 0, lastNeed = 0, stallSince = 0;
+  let lastT = -1, stallBy = [0, 0, 0, 0], lastRaise = 0, lastLower = 0, adaptTimer = null;
   let statTimer = null, ticksWin = 0, stallsWin = 0, reports = new Map(), started = false;
   // mode: 'server' (salas num servidor) | 'host' / 'guest' (sala local, sem servidor: o anfitrião faz o papel do servidor)
   let mode = 'server', hostRoom = null; const pending = new Map();
@@ -41,6 +42,7 @@
   const setState = (s) => { N.state = s; changed(); };
 
   function resetGame() {
+    clearInterval(adaptTimer); adaptTimer = null;
     inputs = [new Map(), new Map(), new Map(), new Map()]; sent = new Map(); myHash = new Map(); peerHash = [new Map(), new Map(), new Map(), new Map()];
     submitted = -1; N.tick = 0; N.stalls = 0; N.desync = null; N.active = false; N.mask = 0; stallSince = 0; started = false;
   }
@@ -299,6 +301,8 @@
     N.delay = N.stats.delay = d; N.mask = mask;
     for (let s = 0; s < MAXP; s++) if (mask >> s & 1) for (let t = 0; t < d; t++) inputs[s].set(t, 0);
     for (let t = 0; t < d; t++) sent.set(t, 0);
+    lastT = d - 1; stallBy = [0, 0, 0, 0]; lastRaise = lastLower = performance.now();
+    clearInterval(adaptTimer); adaptTimer = setInterval(adapt, 1000);
     N.tick = 0; submitted = -1; N.stalls = 0; N.desync = null; N.active = true; ticksWin = stallsWin = 0;
     updateRtt(); setState('playing');
     log('Partida online: ' + (remoteSlots().length + 1) + ' jogadores, ping máx. ' + N.stats.rtt + ' ms (±' + N.stats.jitter + '), atraso de entrada ' + d + ' quadros.');
@@ -306,12 +310,23 @@
   }
 
   // ---------------- lockstep (chamado pelo jogo) ----------------
+  // Adaptação durante a partida: quem fica esperando um jogador pede a ele mais atraso; sem pedidos por um tempo, o atraso desce devagar.
+  function adapt() {
+    if (!N.active) return;
+    const now = performance.now();
+    remoteSlots().forEach((s) => {
+      const n = stallBy[s]; stallBy[s] = 0;
+      if (n >= 2) { const c = connBySlot(s); if (c) sendC(c, C.DELAY, n >= 20 ? 3 : n >= 8 ? 2 : 1, 0); }
+    });
+    if (N.delay > MIN_DELAY && now - lastRaise > 10000 && now - lastLower > 8000) { N.delay--; lastLower = now; }
+  }
   N.beginFrame = function () { frameStart = performance.now(); };
   const haveAll = () => { for (const s of remoteSlots()) if (!inputs[s].has(N.tick)) return false; return true; };
   N.canTick = function () {
     if (!N.active) return 1;
     if (haveAll()) { stallSince = 0; return 1; }
     N.stalls++; stallsWin++;
+    for (const s of remoteSlots()) if (!inputs[s].has(N.tick)) stallBy[s]++;
     const now = performance.now(); if (!stallSince) stallSince = now;
     if (now - stallSince > NEED_AFTER_MS && now - lastNeed > NEED_AFTER_MS) {
       lastNeed = now; N.stats.lost++;
@@ -323,12 +338,22 @@
   N.submit = function (value, hash) {
     if (!N.active || submitted >= N.tick) return;
     submitted = N.tick;
-    const t = N.tick + N.delay, me = N.me.slot;
-    inputs[me].set(t, value); sent.set(t, value);
-    const first = Math.max(0, t - REDUNDANCY + 1), count = t - first + 1, m = new DataView(new ArrayBuffer(6 + 4 * count));
-    m.setUint8(0, U.INPUT); m.setUint8(1, count); m.setUint32(2, first);
-    for (let i = 0; i < count; i++) m.setUint32(6 + 4 * i, sent.get(first + i) >>> 0);
-    eachConn((c) => sendU(c, m.buffer));
+    const want = N.tick + N.delay, me = N.me.slot;
+    // O atraso é só deste jogador: ele pode subir (preenche os quadros que faltam) ou descer (pula um envio) a qualquer momento.
+    if (want > lastT) {
+      const prev = lastT;
+      for (let t = prev + 1; t <= want; t++) { inputs[me].set(t, value); sent.set(t, value); }
+      lastT = want;
+      const first = Math.max(0, Math.min(prev + 1, want - REDUNDANCY + 1)), count = Math.min(250, want - first + 1), m = new DataView(new ArrayBuffer(6 + 4 * count));
+      m.setUint8(0, U.INPUT); m.setUint8(1, count); m.setUint32(2, first);
+      for (let i = 0; i < count; i++) m.setUint32(6 + 4 * i, sent.get(first + i) >>> 0);
+      eachConn((c) => sendU(c, m.buffer));
+    } else {                                                           // atraso diminuiu: reenvia só a redundância
+      const first = Math.max(0, lastT - REDUNDANCY + 1), count = lastT - first + 1, m = new DataView(new ArrayBuffer(6 + 4 * count));
+      m.setUint8(0, U.INPUT); m.setUint8(1, count); m.setUint32(2, first);
+      for (let i = 0; i < count; i++) m.setUint32(6 + 4 * i, sent.get(first + i) >>> 0);
+      eachConn((c) => sendU(c, m.buffer));
+    }
     if (N.tick % HASH_EVERY === 0) { myHash.set(N.tick, hash); eachConn((c) => sendC(c, C.HASH, N.tick, hash)); compareAll(N.tick); }
   };
   N.get = function (slot) { return slot < MAXP ? (inputs[slot].get(N.tick) || 0) : 0; };
@@ -367,6 +392,7 @@
     else if (type === C.REPORT) reports.set(c.id, { rtt: a / 10, jit: b / 10 });
     else if (type === C.GO) begin(a, b);
     else if (type === C.HASH) { if (c.slot >= 0) { peerHash[c.slot].set(a, b); compareAll(a); } }
+    else if (type === C.DELAY) { if (N.active) { N.delay = Math.min(MAX_DELAY, N.delay + a); lastRaise = performance.now(); log('Atraso de entrada ajustado para ' + N.delay + ' quadros.'); } }
     else if (type === C.NEED) { const vals = []; for (let t = a; t < a + 60 && sent.has(t); t++) vals.push(sent.get(t)); if (vals.length) sendC(c, C.BULK, a, vals.length, vals); }
     else if (type === C.BULK) { for (let i = 0; i < b; i++) putRemote(c.slot, a + i, m.getUint32(12 + 4 * i)); }
   }
