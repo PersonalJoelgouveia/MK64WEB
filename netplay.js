@@ -20,7 +20,7 @@
   const FRAME_MS = 1000 / 60, MIN_DELAY = 4, MAX_DELAY = 12, DEFAULT_DELAY = 6, MAXP = 4;
   const HASH_EVERY = 60, REDUNDANCY = 8, MAX_CATCHUP = 3, CATCHUP_BUDGET_MS = 9, NEED_AFTER_MS = 100;
   const U = { INPUT: 1, PING: 2, PONG: 3 };                          // canal "in" (não confiável)
-  const C = { ASK: 1, REPORT: 2, GO: 3, HASH: 4, NEED: 5, BULK: 6 }; // canal "ctl" (confiável)
+  const C = { ASK: 1, REPORT: 2, GO: 3, HASH: 4, NEED: 5, BULK: 6, JSON: 7 }; // canal "ctl" (confiável)
   const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
   const log = (m, k) => (window.MK64Log || console.log)('[online] ' + m, k);
 
@@ -33,6 +33,9 @@
   };
   let ws = null, conns = new Map(), inputs, sent, myHash, peerHash, submitted, frameStart = 0, lastNeed = 0, stallSince = 0;
   let statTimer = null, ticksWin = 0, stallsWin = 0, reports = new Map(), started = false;
+  // mode: 'server' (salas num servidor) | 'host' / 'guest' (sala local, sem servidor: o anfitrião faz o papel do servidor)
+  let mode = 'server', hostRoom = null; const pending = new Map();
+  const uid = () => Math.random().toString(36).slice(2, 10);
   const changed = () => { if (N.onchange) N.onchange(); };
   const setState = (s) => { N.state = s; changed(); };
 
@@ -47,10 +50,17 @@
 
   // ---------------- servidor de salas ----------------
   const wsSend = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+  // Mensagens de sala/sinalização: vão ao servidor (modo 'server'), ao anfitrião (convidado) ou são tratadas aqui (anfitrião).
+  function out(m) {
+    if (mode === 'server') return wsSend(m);
+    if (mode === 'guest') { const h = hostConn(); if (h) sendJson(h, m); return; }
+    if (mode === 'host') hostHandle(null, m);
+  }
+  const hostConn = () => { for (const c of conns.values()) if (c.slot === 0 || c.id === 'host') return c; return null; };
 
   N.connect = function (url, token, nick) {
     return new Promise((resolve, reject) => {
-      N.disconnect(); setState('connecting');
+      N.disconnect(); mode = 'server'; setState('connecting');
       let done = false;
       try { ws = new WebSocket(url); } catch (e) { setState('idle'); return reject(new Error('Endereço do servidor inválido.')); }
       const t = setTimeout(() => { if (!done) { done = true; try { ws.close(); } catch (e) { /* ok */ } setState('idle'); reject(new Error('O servidor não respondeu.')); } }, 8000);
@@ -68,8 +78,8 @@
   N.refresh = () => wsSend({ t: 'list' });
   N.createRoom = (name, password, max, nick) => wsSend({ t: 'create', name, password, max, nick });
   N.joinRoom = (id, password, nick) => wsSend({ t: 'join', id, password, nick });
-  N.leaveRoom = () => { wsSend({ t: 'leave' }); };
-  N.setReady = (v) => { N.localReady = !!v; wsSend({ t: 'ready', value: !!v }); };
+  N.leaveRoom = () => { if (mode === 'server') wsSend({ t: 'leave' }); else { leaveLocal(); mode = 'server'; hostRoom = null; pending.clear(); setState('idle'); } };
+  N.setReady = (v) => { N.localReady = !!v; out({ t: 'ready', value: !!v }); };
 
   function onServer(m) {
     switch (m.t) {
@@ -78,47 +88,144 @@
       case 'joined':
         N.me = { id: m.you.id, slot: m.you.slot, nick: N.me.nick }; N.room = m.room; N.peers = m.peers;
         resetGame(); N.localReady = false; setState('inroom');
+        if (mode === 'guest') {                                       // a conexão com o anfitrião já existe (código manual)
+          const hp = m.peers.find((p) => p.slot === 0), hc = conns.get('host');
+          if (hp && hc) { conns.delete('host'); hc.id = hp.id; hc.slot = 0; hc.nick = hp.nick; conns.set(hc.id, hc); }
+        }
         // quem entra abre conexão com todos que já estavam na sala
-        m.peers.forEach((p) => { if (p.id !== N.me.id) makeConn(p, true); });
+        m.peers.forEach((p) => { if (p.id !== N.me.id && !conns.has(p.id)) makeConn(p, true); });
         break;
-      case 'peers': N.peers = m.peers; N.room = m.room; conns.forEach((c) => { const p = m.peers.find((x) => x.id === c.id); if (p) { c.slot = p.slot; c.nick = p.nick; } }); changed(); break;
-      case 'left': { const c = conns.get(m.id); if (c) { closeConn(c); if (N.active) drop(c.nick); } break; }
+      case 'peers': if (mode === 'guest') N.me.slot = (m.peers.find((x) => x.id === N.me.id) || N.me).slot; N.peers = m.peers; N.room = m.room; conns.forEach((c) => { const p = m.peers.find((x) => x.id === c.id); if (p) { c.slot = p.slot; c.nick = p.nick; } }); changed(); break;
+      case 'left': { const c = conns.get(m.id); if (c) gone(c); break; }
       case 'closed':
         { const was = N.active; leaveLocal(); setState(ws ? 'lobby' : 'idle'); if (was && N.ondrop) N.ondrop(m.reason); else if (N.onerror) N.onerror(m.reason); }
         break;
       case 'signal': onSignal(m.from, m.data); break;
     }
   }
+  // Um jogador (ou o anfitrião) deixou de responder.
+  function gone(c, why) {
+    if (!conns.has(c.id) && !pending.has(c.id)) return;
+    const wasHost = mode === 'guest' && (c.slot === 0 || c.id === 'host');
+    closeConn(c); pending.delete(c.id);
+    if (N.active) return drop(c.nick);
+    if (mode === 'host') { hostRoom.members.delete(c.id); broadcastPeers(); }
+    else if (wasHost) { leaveLocal(); mode = 'server'; setState('idle'); if (N.onerror) N.onerror('O anfitrião saiu da sala.'); }
+    else if (why && N.onerror && mode === 'server') N.onerror(why);
+  }
   function leaveLocal() { conns.forEach(closeConn); conns.clear(); clearInterval(statTimer); statTimer = null; N.room = null; N.peers = []; N.active = false; N.localReady = false; resetGame(); if (N.state === 'inroom' || N.state === 'playing') N.state = ws ? 'lobby' : 'idle'; }
   function drop(nick) { N.active = false; log((nick || 'Um jogador') + ' saiu: sincronismo encerrado.', 'err'); if (N.ondrop) N.ondrop((nick || 'Um jogador') + ' saiu da partida.'); }
+
+  // ---------------- sala local (sem servidor): o anfitrião faz o papel do servidor ----------------
+  function publishRoom() {
+    N.room = { id: hostRoom.id, name: hostRoom.name, max: hostRoom.max, players: hostRoom.members.size, started: hostRoom.started };
+    N.peers = [...hostRoom.members.values()].map((m) => ({ id: m.id, slot: m.slot, nick: m.nick, ready: m.ready }));
+    changed();
+  }
+  function broadcastPeers() { publishRoom(); conns.forEach((c) => { if (c.open && c.member) sendJson(c, { t: 'peers', peers: N.peers, room: N.room }); }); }
+  N.createLocalRoom = function (nick, max) {
+    N.disconnect(); mode = 'host'; pending.clear(); resetGame(); N.localReady = false;
+    const id = uid(); N.me = { id, slot: 0, nick };
+    hostRoom = { id: uid(), name: 'Sala de ' + nick, max: Math.max(2, Math.min(MAXP, max || 2)), started: false, members: new Map([[id, { id, slot: 0, nick, ready: false }]]) };
+    publishRoom(); setState('inroom');
+  };
+  function freeSlot() {
+    const used = new Set([...hostRoom.members.values()].map((m) => m.slot)); pending.forEach((c) => used.add(c.slot));
+    for (let s = 0; s < hostRoom.max; s++) if (!used.has(s)) return s; return -1;
+  }
+  // Anfitrião: gera um convite (código) para o próximo jogador; depois cole a resposta dele em acceptGuest().
+  N.invite = async function () {
+    if (mode !== 'host' || hostRoom.started) throw new Error('Não é possível convidar agora.');
+    const slot = freeSlot(); if (slot < 0) throw new Error('A sala está cheia.');
+    const id = uid(), c = makeManualConn({ id, slot, nick: 'Convidado' }, true); pending.set(id, c);
+    await c.pc.setLocalDescription(await c.pc.createOffer()); await gathered(c.pc);
+    return { id, slot, code: await pack(c.pc.localDescription) };
+  };
+  N.acceptGuest = async function (id, code) {
+    const c = pending.get(id); if (!c) throw new Error('Convite expirado: gere outro.');
+    await c.pc.setRemoteDescription(await unpack(code));
+  };
+  N.cancelInvite = function (id) { const c = pending.get(id); if (c) { pending.delete(id); closeConn(c); } };
+  // Convidado: recebe o código do anfitrião e devolve o código de resposta.
+  N.joinLocal = async function (offerCode, nick) {
+    N.disconnect(); mode = 'guest'; resetGame(); N.localReady = false; N.me = { id: 'me', slot: -1, nick };
+    const c = makeManualConn({ id: 'host', slot: 0, nick: 'Anfitrião' }, false);
+    await c.pc.setRemoteDescription(await unpack(offerCode));
+    await c.pc.setLocalDescription(await c.pc.createAnswer()); await gathered(c.pc);
+    return pack(c.pc.localDescription);
+  };
+  // Anfitrião: trata as mensagens dos convidados (c = conexão do convidado; null = o próprio anfitrião).
+  function hostHandle(c, m) {
+    if (m.t === 'hello' && c && !c.member) {
+      if (hostRoom.started || hostRoom.members.size >= hostRoom.max) { sendJson(c, { t: 'closed', reason: 'A sala não aceita mais jogadores.' }); return; }
+      c.member = true; c.nick = String(m.nick || 'Jogador').slice(0, 20); pending.delete(c.id);
+      hostRoom.members.set(c.id, { id: c.id, slot: c.slot, nick: c.nick, ready: false });
+      publishRoom(); sendJson(c, { t: 'joined', you: { id: c.id, slot: c.slot }, room: N.room, peers: N.peers }); broadcastPeers();
+    } else if (m.t === 'ready') {
+      const mem = hostRoom.members.get(c ? c.id : N.me.id); if (mem) { mem.ready = !!m.value; broadcastPeers(); }
+    } else if (m.t === 'signal' && c) {                       // retransmite a sinalização entre dois convidados
+      const to = conns.get(m.to); if (to && to.member) sendJson(to, { t: 'signal', from: c.id, data: m.data });
+    }
+  }
 
   // ---------------- conexões WebRTC (malha) ----------------
   function makeConn(p, initiator) {
     const pc = new RTCPeerConnection({ iceServers: ICE });
     const c = { id: p.id, slot: p.slot, nick: p.nick, pc, chIn: null, chCtl: null, open: false, rtt: [], pendingIce: [], pingTimer: null, remoteSet: false };
     conns.set(p.id, c);
-    pc.onicecandidate = (e) => { if (e.candidate) wsSend({ t: 'signal', to: c.id, data: { ice: e.candidate } }); };
+    pc.onicecandidate = (e) => { if (e.candidate) out({ t: 'signal', to: c.id, data: { ice: e.candidate } }); };
     pc.onconnectionstatechange = () => {
-      if (['failed', 'closed'].includes(pc.connectionState) && conns.get(c.id) === c) { closeConn(c); if (N.active) drop(c.nick); else if (N.onerror) N.onerror('Falha na conexão com ' + c.nick + ' (rede restrita? pode ser preciso um servidor TURN).'); }
+      if (['failed', 'closed'].includes(pc.connectionState)) gone(c, 'Falha na conexão com ' + c.nick + ' (rede restrita? pode ser preciso um servidor TURN).');
     };
     if (initiator) {
       bindChannel(c, pc.createDataChannel('in', { ordered: false, maxRetransmits: 0 }));
       bindChannel(c, pc.createDataChannel('ctl', { ordered: true }));
-      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => wsSend({ t: 'signal', to: c.id, data: { sdp: pc.localDescription } }));
+      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => out({ t: 'signal', to: c.id, data: { sdp: pc.localDescription } }));
     } else pc.ondatachannel = (e) => bindChannel(c, e.channel);
     return c;
+  }
+  // Conexão sem servidor: o código já leva os candidatos ICE (não há "trickle").
+  function makeManualConn(p, initiator) {
+    const pc = new RTCPeerConnection({ iceServers: ICE });
+    const c = { id: p.id, slot: p.slot, nick: p.nick, pc, chIn: null, chCtl: null, open: false, rtt: [], pendingIce: [], pingTimer: null, remoteSet: false };
+    conns.set(p.id, c);
+    pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState)) gone(c, 'Falha na conexão com ' + c.nick + '.'); };
+    if (initiator) { bindChannel(c, pc.createDataChannel('in', { ordered: false, maxRetransmits: 0 })); bindChannel(c, pc.createDataChannel('ctl', { ordered: true })); }
+    else pc.ondatachannel = (e) => bindChannel(c, e.channel);
+    return c;
+  }
+  function gathered(p) {
+    return new Promise((res) => {
+      if (p.iceGatheringState === 'complete') return res();
+      const done = () => { p.removeEventListener('icegatheringstatechange', chk); res(); };
+      const chk = () => { if (p.iceGatheringState === 'complete') done(); };
+      p.addEventListener('icegatheringstatechange', chk); setTimeout(done, 5000);
+    });
+  }
+  // códigos de sinalização (JSON → deflate → base64url)
+  async function pack(desc) {
+    const raw = new TextEncoder().encode(JSON.stringify({ t: desc.type, s: desc.sdp }));
+    const cs = new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buf = new Uint8Array(await new Response(cs).arrayBuffer()); let b = ''; buf.forEach((x) => (b += String.fromCharCode(x)));
+    return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  async function unpack(code) {
+    const b = atob(code.trim().replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')), buf = Uint8Array.from(b, (x) => x.charCodeAt(0));
+    const ds = new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const o = JSON.parse(new TextDecoder().decode(await new Response(ds).arrayBuffer())); return { type: o.t, sdp: o.s };
   }
   function bindChannel(c, ch) {
     ch.binaryType = 'arraybuffer';
     if (ch.label === 'in') { c.chIn = ch; ch.onmessage = (e) => onUnreliable(c, new DataView(e.data)); }
     else { c.chCtl = ch; ch.onmessage = (e) => onControl(c, new DataView(e.data)); }
     ch.onopen = () => checkOpen(c);
-    ch.onclose = () => { if (conns.get(c.id) === c && c.open) { closeConn(c); if (N.active) drop(c.nick); } };
+    ch.onclose = () => { if (c.open) gone(c); };
     checkOpen(c);
   }
   function checkOpen(c) {
     if (c.open || !c.chIn || !c.chCtl || c.chIn.readyState !== 'open' || c.chCtl.readyState !== 'open') return;
     c.open = true; log('Conectado a ' + c.nick + '.');
+    if (mode === 'guest' && c.id === 'host') sendJson(c, { t: 'hello', nick: N.me.nick });
     c.pingTimer = setInterval(() => { const m = new DataView(new ArrayBuffer(9)); m.setUint8(0, U.PING); m.setFloat64(1, performance.now()); sendU(c, m.buffer); }, 250);
     if (!statTimer) statTimer = setInterval(() => { const s = N.stats; s.tps = ticksWin; s.stallsPerSec = stallsWin; s.delay = N.delay; ticksWin = stallsWin = 0; updateRtt(); }, 1000);
     changed();
@@ -132,7 +239,7 @@
         c = makeConn(p, false);
         await c.pc.setRemoteDescription(data.sdp); c.remoteSet = true;
         await c.pc.setLocalDescription(await c.pc.createAnswer());
-        wsSend({ t: 'signal', to: from, data: { sdp: c.pc.localDescription } });
+        out({ t: 'signal', to: from, data: { sdp: c.pc.localDescription } });
       } else if (c) { await c.pc.setRemoteDescription(data.sdp); c.remoteSet = true; }
       if (c) { c.pendingIce.splice(0).forEach((i) => c.pc.addIceCandidate(i).catch(() => {})); }
     } else if (data.ice) {
@@ -144,6 +251,11 @@
 
   // ---------------- envio ----------------
   function sendU(c, buf) { if (c.chIn && c.chIn.readyState === 'open') c.chIn.send(buf); }
+  function sendJson(c, obj) {
+    if (!c.chCtl || c.chCtl.readyState !== 'open') return;
+    const bytes = new TextEncoder().encode(JSON.stringify(obj)), m = new Uint8Array(4 + bytes.length);
+    new DataView(m.buffer).setUint32(0, C.JSON); m.set(bytes, 4); c.chCtl.send(m.buffer);
+  }
   function sendC(c, type, a, b, extra) {
     if (!c.chCtl || c.chCtl.readyState !== 'open') return;
     const n = extra ? extra.length : 0, m = new DataView(new ArrayBuffer(12 + 4 * n));
@@ -177,7 +289,7 @@
     await new Promise((r) => setTimeout(r, 500));                    // espera os relatórios de RTT dos outros
     let rtt = w.rtt, jit = w.jit; reports.forEach((v) => { rtt = Math.max(rtt, v.rtt); jit = Math.max(jit, v.jit); });
     const d = chooseDelay(rtt, jit); let mask = 0; N.peers.forEach((p) => { mask |= 1 << p.slot; });
-    wsSend({ t: 'start' });
+    if (mode === 'host') { hostRoom.started = true; broadcastPeers(); } else wsSend({ t: 'start' });
     eachConn((c) => sendC(c, C.GO, d, mask));
     begin(d, mask);
   };
@@ -244,7 +356,12 @@
     else if (type === U.PONG) { c.rtt.push(performance.now() - m.getFloat64(1)); if (c.rtt.length > 40) c.rtt.shift(); }
   }
   function onControl(c, m) {
-    const type = m.getUint32(0), a = m.getUint32(4), b = m.getUint32(8);
+    const type = m.getUint32(0);
+    if (type === C.JSON) {
+      let o; try { o = JSON.parse(new TextDecoder().decode(new Uint8Array(m.buffer, m.byteOffset + 4, m.byteLength - 4))); } catch (e) { return; }
+      return mode === 'host' ? hostHandle(c, o) : onServer(o);
+    }
+    const a = m.getUint32(4), b = m.getUint32(8);
     if (type === C.ASK) { const w = worstLocal(); sendC(c, C.REPORT, Math.round(w.rtt * 10), Math.round(w.jit * 10)); }
     else if (type === C.REPORT) reports.set(c.id, { rtt: a / 10, jit: b / 10 });
     else if (type === C.GO) begin(a, b);

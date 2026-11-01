@@ -93,13 +93,32 @@
       <h2>Online</h2>
       <div class="online" id="online">
         <div id="viewServer">
-          <div class="field"><label for="srvUrl">Servidor de salas</label>
-            <input id="srvUrl" type="text" placeholder="wss://seu-servidor.exemplo" autocomplete="off" spellcheck="false"></div>
-          <div class="field"><label for="srvToken">Chave de acesso (se o servidor for fechado)</label>
-            <input id="srvToken" type="password" autocomplete="off"></div>
           <div class="field"><label for="nick">Seu apelido</label>
             <input id="nick" type="text" maxlength="20" placeholder="Jogador"></div>
-          <button class="btn" id="btnConnect" type="button">Conectar</button>
+          <div class="field"><label for="rmMax">Jogadores na sala</label>
+            <select id="rmMax"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></div>
+          <div class="online-actions">
+            <button class="btn" id="btnHost" type="button">Criar sala</button>
+            <button class="btn btn-ghost" id="btnJoin" type="button">Entrar numa sala</button>
+          </div>
+          <div id="joinBox" hidden>
+            <div class="field"><label for="joinOffer">1. Cole aqui o código que o anfitrião te enviou</label>
+              <textarea id="joinOffer" rows="3" spellcheck="false"></textarea></div>
+            <button class="btn" id="btnJoinGo" type="button">Gerar minha resposta</button>
+            <div id="joinAnswerBox" hidden>
+              <div class="field"><label for="joinAnswer">2. Envie este código de volta ao anfitrião</label>
+                <textarea id="joinAnswer" rows="3" readonly></textarea></div>
+              <button class="btn btn-ghost" id="btnCopyAnswer" type="button">Copiar</button>
+              <small>Depois que o anfitrião colar sua resposta, a conexão abre sozinha.</small>
+            </div>
+          </div>
+          <details class="newroom"><summary>Avançado: servidor de salas</summary>
+            <div class="field"><label for="srvUrl">Servidor (wss://…)</label>
+              <input id="srvUrl" type="text" placeholder="wss://seu-servidor.exemplo" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="srvToken">Chave de acesso</label>
+              <input id="srvToken" type="password" autocomplete="off"></div>
+            <button class="btn btn-ghost" id="btnConnect" type="button">Conectar ao servidor</button>
+          </details>
         </div>
         <div id="viewLobby" hidden>
           <div class="online-actions">
@@ -107,24 +126,33 @@
             <button class="btn btn-ghost" id="btnDisconnect" type="button">Sair do servidor</button>
           </div>
           <ul class="rooms" id="roomList"></ul>
-          <details class="newroom"><summary>Criar sala</summary>
+          <details class="newroom"><summary>Criar sala no servidor</summary>
             <div class="field"><label for="rmName">Nome da sala</label><input id="rmName" type="text" maxlength="32"></div>
             <div class="field"><label for="rmPass">Senha (opcional)</label><input id="rmPass" type="password" maxlength="40" autocomplete="off"></div>
-            <div class="field"><label for="rmMax">Jogadores (2 a 4)</label>
-              <select id="rmMax"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
             <button class="btn" id="btnCreate" type="button">Criar</button>
           </details>
         </div>
         <div id="viewRoom" hidden>
           <p class="room-title" id="roomTitle"></p>
           <ul class="players" id="playerList"></ul>
+          <div id="inviteBox" hidden>
+            <button class="btn btn-ghost" id="btnInvite" type="button">Convidar jogador</button>
+            <div id="inviteStep" hidden>
+              <div class="field"><label for="inviteCode">1. Envie este código ao amigo (WhatsApp, Discord…)</label>
+                <textarea id="inviteCode" rows="3" readonly></textarea></div>
+              <button class="btn btn-ghost" id="btnCopyInvite" type="button">Copiar</button>
+              <div class="field"><label for="inviteAnswer">2. Cole aqui a resposta dele</label>
+                <textarea id="inviteAnswer" rows="3" spellcheck="false"></textarea></div>
+              <button class="btn" id="btnAccept" type="button">Conectar</button>
+            </div>
+          </div>
           <div class="online-actions">
             <button class="btn" id="btnStart" type="button" hidden>Iniciar partida</button>
             <button class="btn btn-ghost" id="btnLeave" type="button">Sair da sala</button>
           </div>
         </div>
         <small id="netStats" class="net-stats"></small>
-        <small id="netStatus">Informe o servidor de salas (ele só organiza as salas; o jogo roda direto entre os navegadores).</small>
+        <small id="netStatus">Crie uma sala e convide seus amigos por código — não precisa de servidor. O jogo roda direto entre os navegadores.</small>
       </div>
 
       <h2>Console</h2>

@@ -1,4 +1,4 @@
-/* online-ui.js — painel "Online": servidor de salas, lista de salas (senha opcional), sala/lobby de 2 a 4 jogadores. */
+/* online-ui.js — painel "Online": salas sem servidor (convite por código, 2 a 4 jogadores) + servidor de salas opcional. */
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -22,13 +22,36 @@
     catch (e) { status('Erro: ' + e.message); }
     $('btnConnect').disabled = false;
   });
+  const copy = (id, btn) => { const t = $(id); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } btn.textContent = 'Copiado ✔'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
+  const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { status('Erro: ' + (e && e.message || e)); } btn.disabled = false; };
+  let inviteId = null;
+  $('btnHost').addEventListener('click', () => { store.set('mk64.nick', nick()); $('joinBox').hidden = true; N.createLocalRoom(nick(), +$('rmMax').value); });
+  $('btnJoin').addEventListener('click', () => { $('joinBox').hidden = !$('joinBox').hidden; });
+  $('btnJoinGo').addEventListener('click', () => busy($('btnJoinGo'), async () => {
+    const code = $('joinOffer').value.trim(); if (!code) return status('Cole o código do anfitrião.');
+    store.set('mk64.nick', nick()); status('Gerando resposta…');
+    $('joinAnswer').value = await N.joinLocal(code, nick()); show('joinAnswerBox', true);
+    status('Envie sua resposta ao anfitrião e aguarde.');
+  }));
+  $('btnCopyAnswer').addEventListener('click', (e) => copy('joinAnswer', e.target));
+  $('btnCopyInvite').addEventListener('click', (e) => copy('inviteCode', e.target));
+  $('btnInvite').addEventListener('click', () => busy($('btnInvite'), async () => {
+    if (inviteId) N.cancelInvite(inviteId);
+    status('Gerando convite…'); const r = await N.invite(); inviteId = r.id;
+    $('inviteCode').value = r.code; $('inviteAnswer').value = ''; show('inviteStep', true);
+    status('Envie o código ao amigo e cole a resposta dele abaixo.');
+  }));
+  $('btnAccept').addEventListener('click', () => busy($('btnAccept'), async () => {
+    const code = $('inviteAnswer').value.trim(); if (!code || !inviteId) return status('Cole a resposta do amigo.');
+    await N.acceptGuest(inviteId, code); status('Conectando…');
+  }));
   $('btnDisconnect').addEventListener('click', () => { N.disconnect(); status('Desconectado.'); });
   $('btnRefresh').addEventListener('click', () => N.refresh());
   $('btnCreate').addEventListener('click', () => {
     const name = $('rmName').value.trim(); if (!name) return status('Dê um nome à sala.');
     N.createRoom(name, $('rmPass').value, +$('rmMax').value, nick());
   });
-  $('btnLeave').addEventListener('click', () => { N.leaveRoom(); status('Você saiu da sala.'); });
+  $('btnLeave').addEventListener('click', () => { N.leaveRoom(); inviteId = null; show('inviteStep', false); show('joinAnswerBox', false); status('Você saiu da sala.'); });
   $('btnStart').addEventListener('click', () => { $('btnStart').disabled = true; N.start(); });
   $('roomList').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-id]'); if (!b) return;
@@ -38,7 +61,7 @@
   });
 
   function render() {
-    const inServer = N.state !== 'idle' && N.state !== 'connecting', inRoom = N.state === 'inroom' || N.state === 'playing';
+    const inRoom = N.state === 'inroom' || N.state === 'playing', inServer = N.state === 'lobby';
     show('viewServer', !inServer); show('viewLobby', inServer && !inRoom); show('viewRoom', inRoom);
     if (inServer && !inRoom) {
       const l = $('roomList');
@@ -56,6 +79,9 @@
       }).join('');
       const host = N.me && N.me.slot === 0;
       show('btnStart', host && N.state === 'inroom');
+      const full = N.room && N.peers.length >= N.room.max;
+      show('inviteBox', host && N.state === 'inroom' && !full);
+      if (inviteId && N.peers.length && !host === false && N.peers.some((p) => p.id === inviteId)) { inviteId = null; show('inviteStep', false); }
       $('btnStart').disabled = !N.canStart();
       if (N.state === 'inroom') {
         status(host ? (N.canStart() ? 'Todos prontos: clique em "Iniciar partida".' : 'Aguardando todos ficarem prontos (carregue sua ROM e espere os assets).')
