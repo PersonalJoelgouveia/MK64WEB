@@ -114,6 +114,13 @@ Validado no Chromium com 2 abas: conexão, partida iniciada, ~670 quadros em sin
 **Não validado:** entre dois aparelhos/redes reais (STUN público, NAT simétrico precisaria de TURN), controle do jogador 2 em corrida,
 latência alta (o jogo trava esperando o outro), 3–4 jogadores.
 
+## Desempenho
+
+Build do jogo em `-O2` (compilação e link; o link com `-O` roda o `wasm-opt`), `-sASSERTIONS=0` e `-sMALLOC=mimalloc`
+(o alocador padrão usa um lock global e pesa com várias threads). Validado só quanto à corretude (a corrida renderiza igual);
+o ganho de FPS não foi medido (o sandbox renderiza por software). Pontos restantes: compilação de shaders sob demanda (engasgos
+na primeira vez que um efeito aparece) e custo do Fast3D na thread principal.
+
 ## Licença (não confirmada)
 
 O SpaghettiKart **não tem arquivo `LICENSE`** e traz código com copyright da SGI/Nintendo (cabeçalhos do libultra).

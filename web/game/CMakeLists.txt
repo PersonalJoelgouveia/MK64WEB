@@ -32,7 +32,7 @@ target_include_directories(spaghetti_web PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${C
 target_compile_definitions(spaghetti_web PRIVATE NDEBUG VERSION_US=1 USE_OPENGLES ENABLE_RUMBLE=1 F3DEX_GBI=1 _LANGUAGE_C
   _USE_MATH_DEFINES CIMGUI_DEFINE_ENUMS_AND_STRUCTS NON_MATCHING=1 NON_EQUIVALENT=1 AVOID_UB=1
   SPAGHETTI_VERSION="1.0.0" EXCLUDE_MPQ_SUPPORT)
-target_compile_options(spaghetti_web PRIVATE -O1 -w -ffast-math -pthread -fexceptions
+target_compile_options(spaghetti_web PRIVATE -O2 -w -ffast-math -pthread -fexceptions
   "$<$<COMPILE_LANGUAGE:C>:-Wno-incompatible-pointer-types;-Wno-int-conversion>"
   "$<$<COMPILE_LANGUAGE:CXX>:-fpermissive;-Wno-c++11-narrowing;-DFMT_CONSTEVAL=>")
 target_link_libraries(spaghetti_web PRIVATE libultraship)
@@ -41,6 +41,6 @@ set_target_properties(spaghetti_web PROPERTIES SUFFIX ".html")
 target_link_options(spaghetti_web PRIVATE
   -pthread -fexceptions -sUSE_WEBGL2=1 -sFULL_ES3=1 -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=536870912 -sMAXIMUM_MEMORY=2147483648 -sPTHREAD_POOL_SIZE=8
-  -sASSERTIONS=1 -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1 -sSTACK_SIZE=2097152
+  -O2 -sASSERTIONS=0 -sMALLOC=mimalloc -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1 -sSTACK_SIZE=2097152
   -sEXPORTED_RUNTIME_METHODS=FS,callMain,addRunDependency,removeRunDependency -lidbfs.js)
 target_link_options(spaghetti_web PRIVATE --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/prerun.js)
