@@ -19,3 +19,12 @@ O site é HTTPS, então o navegador exige **`wss://`** (TLS). Opções:
 
 Coloque o endereço em `config.js` (`signalUrl`) para os jogadores não precisarem digitar.
 Se a rede de algum jogador bloquear conexões diretas (NAT restritivo/4G), é preciso um servidor TURN (não incluído).
+
+## Um comando só (servidor + túnel)
+
+```
+cd server
+npm install        # só na primeira vez
+node start.js minhachave
+```
+Mostra `wss://….serveo.net`: cole no painel Online (com a chave) e clique em Conectar. Ctrl+C encerra tudo.
