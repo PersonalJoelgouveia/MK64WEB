@@ -105,7 +105,9 @@ Testado: reabrir o navegador mantém `/save` e o `mk64.o2r` em cache (sem reextr
 ## Multiplayer (`netplay.js`, `online-ui.js`, `game/webnet.c`, `server/`)
 
 2 a 4 jogadores (o jogo tem no máximo 4 humanos: 3P/4P em tela dividida). WebRTC **em malha** (cada jogador ligado direto aos
-outros) com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam. **Salas sem servidor (padrão):** o anfitrião clica em "Criar sala" e "Convidar jogador", manda o código ao amigo (WhatsApp etc.),
+outros) com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam. **Servidor de salas (recomendado, 1 clique):** o anfitrião conecta ao servidor, clica em "Criar sala" e "Copiar link de convite"; o amigo só abre o link (ele já leva servidor, chave e sala) e carrega a ROM.
+
+**Salas sem servidor (alternativa por código):** o anfitrião clica em "Criar sala" e "Convidar jogador", manda o código ao amigo (WhatsApp etc.),
 o amigo cola em "Entrar numa sala" e devolve o código de resposta; repetir para cada jogador (até 4). O anfitrião retransmite a
 sinalização entre os convidados, então a malha convidado↔convidado se forma sozinha. Opcional: servidor de salas com lista/senha em
 `server/server.js` (Node + `ws`), só para sinalização; ver `server/README.md`.

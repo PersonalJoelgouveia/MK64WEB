@@ -14,14 +14,24 @@
   $('srvToken').value = store.get('mk64.token');
   $('nick').value = store.get('mk64.nick');
 
-  $('btnConnect').addEventListener('click', async () => {
+  let roomPass = '', autoJoin = null;
+  // link de convite: #s=<servidor>&t=<chave>&r=<sala>&p=<senha>
+  try {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get('s')) { $('srvUrl').value = h.get('s'); $('srvToken').value = h.get('t') || ''; if (h.get('r')) autoJoin = { id: h.get('r'), pass: h.get('p') || '' }; history.replaceState(null, '', location.pathname + location.search); }
+  } catch (e) { /* ok */ }
+  async function connect() {
     const url = $('srvUrl').value.trim(); if (!url) return status('Informe o endereço do servidor (wss://…).');
-    store.set('mk64.server', url); store.set('mk64.token', $('srvToken').value); store.set('mk64.nick', nick());
+    store.set('mk64.server', url); store.set('mk64.token', $('srvToken').value); store.set('mk64.nick', nick()); store.set('mk64.auto', '1');
     status('Conectando ao servidor…'); $('btnConnect').disabled = true;
-    try { await N.connect(url, $('srvToken').value, nick()); status('Escolha uma sala ou crie a sua.'); }
-    catch (e) { status('Erro: ' + e.message); }
+    try {
+      await N.connect(url, $('srvToken').value, nick()); status('Escolha uma sala ou crie a sua.');
+      if (autoJoin) { const j = autoJoin; autoJoin = null; N.joinRoom(j.id, j.pass, nick()); }
+    } catch (e) { status('Erro: ' + e.message); autoJoin = null; }
     $('btnConnect').disabled = false;
-  });
+  }
+  $('btnConnect').addEventListener('click', connect);
+  if ($('srvUrl').value.trim() && (autoJoin || store.get('mk64.auto') === '1')) setTimeout(connect, 0);
   const copy = (id, btn) => { const t = $(id); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } btn.textContent = 'Copiado ✔'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
   const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { status('Erro: ' + (e && e.message || e)); } btn.disabled = false; };
   let inviteId = null;
@@ -48,8 +58,13 @@
   $('btnDisconnect').addEventListener('click', () => { N.disconnect(); status('Desconectado.'); });
   $('btnRefresh').addEventListener('click', () => N.refresh());
   $('btnCreate').addEventListener('click', () => {
-    const name = $('rmName').value.trim(); if (!name) return status('Dê um nome à sala.');
-    N.createRoom(name, $('rmPass').value, +$('rmMax').value, nick());
+    const name = $('rmName').value.trim() || ('Sala de ' + nick());
+    roomPass = $('rmPass').value; N.createRoom(name, roomPass, 4, nick());
+  });
+  $('btnShare').addEventListener('click', () => {
+    const p = new URLSearchParams({ s: $('srvUrl').value.trim(), t: $('srvToken').value, r: N.room.id }); if (roomPass) p.set('p', roomPass);
+    const link = location.origin + location.pathname + '#' + p.toString();
+    try { navigator.clipboard.writeText(link); status('Link copiado! Envie aos amigos: eles só abrem o link e carregam a ROM.'); } catch (e) { window.prompt('Copie o link:', link); }
   });
   $('btnLeave').addEventListener('click', () => { N.leaveRoom(); inviteId = null; show('inviteStep', false); show('joinAnswerBox', false); status('Você saiu da sala.'); });
   $('btnStart').addEventListener('click', () => { $('btnStart').disabled = true; N.start(); });
@@ -60,6 +75,7 @@
     N.joinRoom(b.dataset.id, pass, nick());
   });
 
+  const inServerMode = () => !!(N.room && N.room.locked !== undefined);
   function render() {
     const inRoom = N.state === 'inroom' || N.state === 'playing', inServer = N.state === 'lobby';
     show('viewServer', !inServer); show('viewLobby', inServer && !inRoom); show('viewRoom', inRoom);
@@ -80,6 +96,7 @@
       const host = N.me && N.me.slot === 0;
       show('btnStart', host && N.state === 'inroom');
       const full = N.room && N.peers.length >= N.room.max;
+      show('btnShare', host && N.state === 'inroom' && !!$('srvUrl').value.trim() && inServerMode());
       show('inviteBox', host && N.state === 'inroom' && !full);
       if (inviteId && N.peers.length && !host === false && N.peers.some((p) => p.id === inviteId)) { inviteId = null; show('inviteStep', false); }
       $('btnStart').disabled = !N.canStart();
