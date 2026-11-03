@@ -384,3 +384,4 @@ kbd {
 .newroom summary { cursor: pointer; color: var(--muted, #9aa3b2); font-size: .85rem; margin-bottom: 8px; }
 .room-title { margin: 0 0 4px; font-weight: 600; }
 .online [hidden] { display: none !important; }
+.room-code{font-size:1.1rem;font-weight:800;letter-spacing:.15em;text-align:center;margin:6px 0}

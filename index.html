@@ -95,17 +95,21 @@
         <div id="viewServer">
           <div class="field"><label for="nick">Seu apelido</label>
             <input id="nick" type="text" maxlength="20" placeholder="Jogador"></div>
-          <div class="field"><label for="srvUrl">Servidor (wss://…)</label>
-            <input id="srvUrl" type="text" placeholder="wss://seu-servidor.exemplo" autocomplete="off" spellcheck="false"></div>
-          <div class="field"><label for="srvToken">Chave de acesso (se houver)</label>
-            <input id="srvToken" type="password" autocomplete="off"></div>
-          <button class="btn" id="btnConnect" type="button">Conectar</button>
-          <details class="newroom"><summary>Sem servidor (por código)</summary>
+          <button class="btn" id="btnHost" type="button">Criar sala</button>
+          <div class="field"><label for="joinCode">Já tem um código? Entre na sala</label>
+            <input id="joinCode" type="text" maxlength="8" placeholder="Ex.: K7M2QX" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+          <button class="btn btn-ghost" id="btnJoinCode" type="button">Entrar</button>
+          <details class="newroom"><summary>Avançado</summary>
+            <div class="field"><label for="srvUrl">Servidor próprio (wss://…)</label>
+              <input id="srvUrl" type="text" placeholder="wss://seu-servidor.exemplo" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="srvToken">Chave de acesso</label>
+              <input id="srvToken" type="password" autocomplete="off"></div>
+            <button class="btn btn-ghost" id="btnConnect" type="button">Conectar ao servidor</button>
             <div class="field"><label for="rmMax">Jogadores na sala</label>
               <select id="rmMax"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></div>
             <div class="online-actions">
-              <button class="btn" id="btnHost" type="button">Criar sala</button>
-              <button class="btn btn-ghost" id="btnJoin" type="button">Entrar numa sala</button>
+              <button class="btn btn-ghost" id="btnHostManual" type="button">Sala por códigos manuais</button>
+              <button class="btn btn-ghost" id="btnJoin" type="button">Entrar por código manual</button>
             </div>
             <div id="joinBox" hidden>
               <div class="field"><label for="joinOffer">1. Cole o código do anfitrião</label>
@@ -133,6 +137,7 @@
         </div>
         <div id="viewRoom" hidden>
           <p class="room-title" id="roomTitle"></p>
+          <p class="room-code" id="roomCode" hidden></p>
           <ul class="players" id="playerList"></ul>
           <div id="inviteBox" hidden>
             <button class="btn btn-ghost" id="btnInvite" type="button">Convidar jogador</button>
@@ -152,7 +157,7 @@
           </div>
         </div>
         <small id="netStats" class="net-stats"></small>
-        <small id="netStatus">Conecte ao servidor, crie a sala e envie o link de convite: seus amigos entram com um clique.</small>
+        <small id="netStatus">Toque em “Criar sala” e envie o link aos amigos: eles entram com um toque. Funciona só com o celular.</small>
       </div>
 
       <h2>Console</h2>

@@ -14,12 +14,13 @@
   $('srvToken').value = store.get('mk64.token');
   $('nick').value = store.get('mk64.nick');
 
-  let roomPass = '', autoJoin = null;
+  let roomPass = '', autoJoin = null, autoCode = null;
   // link de convite: #s=<servidor>&t=<chave>&r=<sala>&p=<senha>
   try {
     const h = new URLSearchParams(location.hash.slice(1));
-    if (h.get('s')) { $('srvUrl').value = h.get('s'); $('srvToken').value = h.get('t') || ''; if (h.get('r')) autoJoin = { id: h.get('r'), pass: h.get('p') || '' }; history.replaceState(null, '', location.pathname + location.search); }
+    if (h.get('s')) { $('srvUrl').value = h.get('s'); $('srvToken').value = h.get('t') || ''; if (h.get('r')) autoJoin = { id: h.get('r'), pass: h.get('p') || '' }; }
   } catch (e) { /* ok */ }
+  try { const h2 = new URLSearchParams(location.hash.slice(1)); if (h2.get('c')) { $('joinCode').value = h2.get('c'); autoCode = h2.get('c'); } } catch (e) { /* ok */ }
   async function connect() {
     const url = $('srvUrl').value.trim(); if (!url) return status('Informe o endereço do servidor (wss://…).');
     store.set('mk64.server', url); store.set('mk64.token', $('srvToken').value); store.set('mk64.nick', nick()); store.set('mk64.auto', '1');
@@ -31,11 +32,23 @@
     $('btnConnect').disabled = false;
   }
   $('btnConnect').addEventListener('click', connect);
-  if ($('srvUrl').value.trim() && (autoJoin || store.get('mk64.auto') === '1')) setTimeout(connect, 0);
+  if (autoCode) setTimeout(() => joinCode(autoCode), 0);
+  else if ($('srvUrl').value.trim() && (autoJoin || store.get('mk64.auto') === '1')) setTimeout(connect, 0);
   const copy = (id, btn) => { const t = $(id); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } btn.textContent = 'Copiado ✔'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
   const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { status('Erro: ' + (e && e.message || e)); } btn.disabled = false; };
   let inviteId = null;
-  $('btnHost').addEventListener('click', () => { store.set('mk64.nick', nick()); $('joinBox').hidden = true; N.createLocalRoom(nick(), +$('rmMax').value); });
+  $('btnHost').addEventListener('click', () => busy($('btnHost'), async () => {
+    store.set('mk64.nick', nick()); status('Criando sala…'); await N.createCodeRoom(nick(), 4);
+    status('Sala criada! Toque em “Copiar link de convite” e mande aos amigos.');
+  }));
+  $('btnHostManual').addEventListener('click', () => { store.set('mk64.nick', nick()); $('joinBox').hidden = true; N.createLocalRoom(nick(), +$('rmMax').value); });
+  async function joinCode(code) {
+    store.set('mk64.nick', nick()); status('Procurando a sala…'); $('btnJoinCode').disabled = true;
+    try { await N.joinByCode(code, nick()); status('Entrando na sala…'); } catch (e) { status('Erro: ' + (e && e.message || e)); }
+    $('btnJoinCode').disabled = false;
+  }
+  $('btnJoinCode').addEventListener('click', () => joinCode($('joinCode').value));
+  $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinCode($('joinCode').value); });
   $('btnJoin').addEventListener('click', () => { $('joinBox').hidden = !$('joinBox').hidden; });
   $('btnJoinGo').addEventListener('click', () => busy($('btnJoinGo'), async () => {
     const code = $('joinOffer').value.trim(); if (!code) return status('Cole o código do anfitrião.');
@@ -62,6 +75,12 @@
     roomPass = $('rmPass').value; N.createRoom(name, roomPass, 4, nick());
   });
   $('btnShare').addEventListener('click', () => {
+    if (N.code) {
+      const link = location.origin + location.pathname + '#c=' + N.code;
+      if (navigator.share) { navigator.share({ title: 'Mario Kart 64 online', text: 'Entra na minha sala (código ' + N.code + '):', url: link }).catch(() => {}); return; }
+      try { navigator.clipboard.writeText(link); status('Link copiado! Envie aos amigos: eles só abrem o link e carregam a ROM.'); } catch (e) { window.prompt('Copie o link:', link); }
+      return;
+    }
     const p = new URLSearchParams({ s: $('srvUrl').value.trim(), t: $('srvToken').value, r: N.room.id }); if (roomPass) p.set('p', roomPass);
     const link = location.origin + location.pathname + '#' + p.toString();
     try { navigator.clipboard.writeText(link); status('Link copiado! Envie aos amigos: eles só abrem o link e carregam a ROM.'); } catch (e) { window.prompt('Copie o link:', link); }
@@ -78,7 +97,7 @@
   const inServerMode = () => N.mode === 'server';
   function render() {
     const inRoom = N.state === 'inroom' || N.state === 'playing', inServer = N.state === 'lobby';
-    show('viewServer', !inServer); show('viewLobby', inServer && !inRoom); show('viewRoom', inRoom);
+    show('viewServer', !inServer && !inRoom); show('viewLobby', inServer && !inRoom); show('viewRoom', inRoom);
     if (inServer && !inRoom) {
       const l = $('roomList');
       l.innerHTML = N.rooms.length ? N.rooms.map((r) =>
@@ -96,8 +115,10 @@
       const host = N.me && N.me.slot === 0;
       show('btnStart', host && N.state === 'inroom');
       const full = N.room && N.peers.length >= N.room.max;
-      show('btnShare', host && N.state === 'inroom' && inServerMode());
-      show('inviteBox', host && N.state === 'inroom' && !full && N.mode === 'host');
+      show('btnShare', host && N.state === 'inroom' && (inServerMode() || !!N.code));
+      $('btnShare').textContent = N.code ? 'Enviar link de convite' : 'Copiar link de convite';
+      const rc = $('roomCode'); rc.hidden = !N.code; rc.textContent = N.code ? 'Código: ' + N.code : '';
+      show('inviteBox', host && N.state === 'inroom' && !full && N.mode === 'host' && !N.code);
       if (inviteId && N.peers.length && !host === false && N.peers.some((p) => p.id === inviteId)) { inviteId = null; show('inviteStep', false); }
       $('btnStart').disabled = !N.canStart();
       if (N.state === 'inroom') {

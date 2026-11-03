@@ -26,6 +26,7 @@
 
   const N = {
     get mode() { return mode; },
+    code: null,               // código da sala (salas por código, sem servidor próprio)
     state: 'idle',            // idle | connecting | lobby | inroom | playing | closed
     me: null, room: null, peers: [], rooms: [], active: false, mask: 0,
     tick: 0, delay: DEFAULT_DELAY, stalls: 0, desync: null, localReady: false,
@@ -91,7 +92,8 @@
       case 'joined':
         N.me = { id: m.you.id, slot: m.you.slot, nick: N.me.nick }; N.room = m.room; N.peers = m.peers;
         resetGame(); N.localReady = false; setState('inroom');
-        if (mode === 'guest') {                                       // a conexão com o anfitrião já existe (código manual)
+        if (mode === 'guest') {
+          sigClose();                                       // a conexão com o anfitrião já existe (código manual)
           const hp = m.peers.find((p) => p.slot === 0), hc = conns.get('host');
           if (hp && hc) { conns.delete('host'); hc.id = hp.id; hc.slot = 0; hc.nick = hp.nick; conns.set(hc.id, hc); }
         }
@@ -116,7 +118,7 @@
     else if (wasHost) { leaveLocal(); mode = 'server'; setState('idle'); if (N.onerror) N.onerror('O anfitrião saiu da sala.'); }
     else if (why && N.onerror && mode === 'server') N.onerror(why);
   }
-  function leaveLocal() { conns.forEach(closeConn); conns.clear(); clearInterval(statTimer); statTimer = null; N.room = null; N.peers = []; N.active = false; N.localReady = false; resetGame(); if (N.state === 'inroom' || N.state === 'playing') N.state = ws ? 'lobby' : 'idle'; }
+  function leaveLocal() { sigClose(); N.code = null; conns.forEach(closeConn); conns.clear(); clearInterval(statTimer); statTimer = null; N.room = null; N.peers = []; N.active = false; N.localReady = false; resetGame(); if (N.state === 'inroom' || N.state === 'playing') N.state = ws ? 'lobby' : 'idle'; }
   function drop(nick) { N.active = false; log((nick || 'Um jogador') + ' saiu: sincronismo encerrado.', 'err'); if (N.ondrop) N.ondrop((nick || 'Um jogador') + ' saiu da partida.'); }
 
   // ---------------- sala local (sem servidor): o anfitrião faz o papel do servidor ----------------
@@ -156,6 +158,108 @@
     await c.pc.setRemoteDescription(await unpack(offerCode));
     await c.pc.setLocalDescription(await c.pc.createAnswer()); await gathered(c.pc);
     return pack(c.pc.localDescription);
+  };
+  // ---------------- salas por código (sem servidor próprio): sinalização por um broker MQTT público ----------------
+  // Só a "troca de códigos" é automática: o anfitrião ouve em mk64web/v1/<sala>/join, o convidado manda a oferta e recebe a resposta.
+  // Depois disso o jogo corre direto entre os navegadores (WebRTC); o broker nunca vê os comandos.
+  const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'];
+  const T = (code, k) => 'mk64web/v1/' + code + '/' + k;
+  let sig = null, guestWait = null; const seen = new Set();
+  function mqttConnect(url, onMsg) {
+    return new Promise((resolve, reject) => {
+      let ws; try { ws = new WebSocket(url, 'mqtt'); } catch (e) { return reject(e); }
+      ws.binaryType = 'arraybuffer';
+      let buf = new Uint8Array(0), pid = 1, ping = null, done = false;
+      const enc = new TextEncoder(), dec = new TextDecoder();
+      const str = (x) => { const b = enc.encode(x); return [b.length >> 8, b.length & 255, ...b]; };
+      const vlen = (n) => { const o = []; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; o.push(d); } while (n > 0); return o; };
+      const pkt = (h, body) => { if (ws.readyState === 1) ws.send(new Uint8Array([h, ...vlen(body.length), ...body])); };
+      const t = setTimeout(() => { if (!done) { done = true; try { ws.close(); } catch (e) { /* ok */ } reject(new Error('timeout')); } }, 6000);
+      const api = {
+        sub(topic) { pkt(0x82, [pid >> 8, pid & 255, ...str(topic), 0]); pid = (pid % 60000) + 1; },
+        pub(topic, text) { pkt(0x30, [...str(topic), ...enc.encode(text)]); },
+        close() { clearInterval(ping); try { ws.onclose = null; ws.close(); } catch (e) { /* ok */ } },
+      };
+      ws.onopen = () => pkt(0x10, [...str('MQTT'), 4, 2, 0, 30, ...str('mk64w-' + uid() + uid())]);
+      ws.onerror = () => { if (!done) { done = true; clearTimeout(t); reject(new Error('erro')); } };
+      ws.onclose = () => { clearInterval(ping); if (!done) { done = true; clearTimeout(t); reject(new Error('fechou')); } };
+      ws.onmessage = (ev) => {
+        const add = new Uint8Array(ev.data), nb = new Uint8Array(buf.length + add.length); nb.set(buf); nb.set(add, buf.length); buf = nb;
+        for (;;) {
+          if (buf.length < 2) return;
+          let rem = 0, mul = 1, i = 1, b;
+          do { if (i >= buf.length) return; b = buf[i++]; rem += (b & 127) * mul; mul *= 128; } while (b & 128);
+          if (buf.length < i + rem) return;
+          const h = buf[0], body = buf.slice(i, i + rem); buf = buf.slice(i + rem);
+          if (h >> 4 === 2) {                                         // CONNACK
+            if (done) continue; done = true; clearTimeout(t);
+            if (body[1] === 0) { ping = setInterval(() => { if (ws.readyState === 1) ws.send(new Uint8Array([0xC0, 0])); }, 20000); resolve(api); } else reject(new Error('recusado'));
+          } else if (h >> 4 === 3) {                                  // PUBLISH
+            const tl = (body[0] << 8) | body[1], off = 2 + tl + (((h >> 1) & 3) ? 2 : 0);
+            try { onMsg(dec.decode(body.slice(2, 2 + tl)), dec.decode(body.slice(off))); } catch (e) { /* ignora */ }
+          }
+        }
+      };
+    });
+  }
+  // conecta em todos os brokers em paralelo e segue assim que o primeiro responde; mensagens vão para todos, duplicatas são descartadas
+  function sigOpen(onMsg) {
+    return new Promise((resolve, reject) => {
+      const live = [], topics = new Set(); let pendingN = BROKERS.length, first = true, closed = false;
+      const o = {
+        sub(t) { topics.add(t); live.forEach((a) => a.sub(t)); },
+        pub(t, x) { live.forEach((a) => a.pub(t, x)); },
+        close() { closed = true; live.forEach((a) => a.close()); live.length = 0; },
+      };
+      BROKERS.forEach((u) => mqttConnect(u, onMsg).then((a) => {
+        if (closed) return a.close();
+        live.push(a); topics.forEach((t) => a.sub(t)); if (first) { first = false; resolve(o); }
+      }, () => {
+        if (--pendingN === 0 && first) reject(new Error('Não consegui falar com o serviço de salas. Verifique a internet ou tente de novo.'));
+      }));
+    });
+  }
+  function sigClose() { if (sig) { sig.close(); sig = null; } guestWait = null; }
+  const newCode = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let c = ''; for (let i = 0; i < 6; i++) c += a[Math.floor(Math.random() * a.length)]; return c; };
+  function onSigMsg(topic, text) {
+    let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (!m || seen.has(m.i)) return; seen.add(m.i); if (seen.size > 500) seen.clear();
+    if (/\/join$/.test(topic)) hostAnswer(m); else if (/\/a\/[^/]+$/.test(topic) && guestWait) { m.err ? guestWait.rej(new Error(m.err)) : guestWait.res(m); }
+  }
+  N.createCodeRoom = async function (nick, max) {
+    N.createLocalRoom(nick, max); const code = newCode();
+    try { sig = await sigOpen(onSigMsg); } catch (e) { N.leaveRoom(); throw e; }
+    if (mode !== 'host') return sig.close();
+    N.code = code; hostRoom.code = code; sig.sub(T(code, 'join')); changed();
+  };
+  async function hostAnswer(m) {
+    if (mode !== 'host' || !hostRoom || !sig || hostRoom.started || !m.gid || !m.offer || pending.has(m.gid) || conns.has(m.gid)) return;
+    const code = hostRoom.code, slot = freeSlot();
+    if (slot < 0) { sig.pub(T(code, 'a/' + m.gid), JSON.stringify({ i: uid(), err: 'A sala está cheia.' })); return; }
+    const c = makeManualConn({ id: m.gid, slot, nick: 'Convidado' }, false); pending.set(m.gid, c);
+    setTimeout(() => { if (pending.get(m.gid) === c) { pending.delete(m.gid); closeConn(c); } }, 45000);
+    try {
+      await c.pc.setRemoteDescription(await unpack(m.offer));
+      await c.pc.setLocalDescription(await c.pc.createAnswer()); await gathered(c.pc);
+      if (sig) sig.pub(T(code, 'a/' + m.gid), JSON.stringify({ i: uid(), answer: await pack(c.pc.localDescription) }));
+    } catch (e) { pending.delete(m.gid); closeConn(c); }
+  }
+  N.joinByCode = async function (code, nick) {
+    code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 4) throw new Error('Digite o código da sala.');
+    N.disconnect(); mode = 'guest'; resetGame(); N.localReady = false;
+    const gid = uid(); N.me = { id: gid, slot: -1, nick }; N.code = code;
+    const c = makeManualConn({ id: 'host', slot: 0, nick: 'Anfitrião' }, true); let timer = null;
+    try {
+      sig = await sigOpen(onSigMsg); sig.sub(T(code, 'a/' + gid));
+      await c.pc.setLocalDescription(await c.pc.createOffer()); await gathered(c.pc);
+      const offer = await pack(c.pc.localDescription);
+      const wait = new Promise((res, rej) => { guestWait = { res, rej }; setTimeout(() => rej(new Error('Sala não encontrada. Confira o código e se o anfitrião está com a sala aberta.')), 25000); });
+      const send = () => { if (sig) sig.pub(T(code, 'join'), JSON.stringify({ i: uid(), gid, offer })); };
+      send(); timer = setInterval(send, 4000);
+      const r = await wait; clearInterval(timer);
+      await c.pc.setRemoteDescription(await unpack(r.answer));
+    } catch (e) { clearInterval(timer); N.disconnect(); mode = 'server'; throw e; }
   };
   // Anfitrião: trata as mensagens dos convidados (c = conexão do convidado; null = o próprio anfitrião).
   function hostHandle(c, m) {
@@ -292,7 +396,7 @@
     await new Promise((r) => setTimeout(r, 500));                    // espera os relatórios de RTT dos outros
     let rtt = w.rtt, jit = w.jit; reports.forEach((v) => { rtt = Math.max(rtt, v.rtt); jit = Math.max(jit, v.jit); });
     const d = chooseDelay(rtt, jit); let mask = 0; N.peers.forEach((p) => { mask |= 1 << p.slot; });
-    if (mode === 'host') { hostRoom.started = true; broadcastPeers(); } else wsSend({ t: 'start' });
+    if (mode === 'host') { hostRoom.started = true; broadcastPeers(); sigClose(); } else wsSend({ t: 'start' });
     eachConn((c) => sendC(c, C.GO, d, mask));
     begin(d, mask);
   };

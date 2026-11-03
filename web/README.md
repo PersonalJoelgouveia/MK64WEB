@@ -105,7 +105,9 @@ Testado: reabrir o navegador mantém `/save` e o `mk64.o2r` em cache (sem reextr
 ## Multiplayer (`netplay.js`, `online-ui.js`, `game/webnet.c`, `server/`)
 
 2 a 4 jogadores (o jogo tem no máximo 4 humanos: 3P/4P em tela dividida). WebRTC **em malha** (cada jogador ligado direto aos
-outros) com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam. **Servidor de salas (recomendado, 1 clique):** o anfitrião conecta ao servidor, clica em "Criar sala" e "Copiar link de convite"; o amigo só abre o link (ele já leva servidor, chave e sala) e carrega a ROM.
+outros) com **lockstep**: cada navegador roda o jogo inteiro e só os comandos trafegam. **Salas por código (padrão, só com o celular):** "Criar sala" gera um código (ex.: K7M2QX) e o link `#c=CÓDIGO`; o amigo abre o link (ou digita o código) e entra. A troca de ofertas WebRTC passa por brokers MQTT públicos (`broker.emqx.io`, `broker.hivemq.com`, `test.mosquitto.org`, tópicos `mk64web/v1/<sala>/…`) só durante a entrada; depois o jogo corre direto entre os navegadores. Se algum broker sair do ar, edite `BROKERS` em `netplay.js`. Testado com um broker MQTT falso local (os públicos não são alcançáveis do ambiente de desenvolvimento).
+
+**Servidor de salas próprio (opcional, 1 clique):** o anfitrião conecta ao servidor, clica em "Criar sala" e "Copiar link de convite"; o amigo só abre o link (ele já leva servidor, chave e sala) e carrega a ROM.
 
 **Salas sem servidor (alternativa por código):** o anfitrião clica em "Criar sala" e "Convidar jogador", manda o código ao amigo (WhatsApp etc.),
 o amigo cola em "Entrar numa sala" e devolve o código de resposta; repetir para cada jogador (até 4). O anfitrião retransmite a
